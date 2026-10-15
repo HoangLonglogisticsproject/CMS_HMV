@@ -87,7 +87,7 @@ interface ArticleEditorViewProps {
 export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
   const router = useRouter();
   const can = useCan();
-  const { data: articleData, isLoading, error, refetch } = useArticleDetail(articleId);
+  const { data: articleData, error, isFetching, refetch } = useArticleDetail(articleId);
   const { data: categories = [] } = useArticleCategories();
   const updateMutation = useSaveArticleDraft();
 
@@ -233,9 +233,11 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
   };
 
   const resolveConflict = async (applyMine: boolean) => {
-    const { data: latest, error: refetchError } = await refetch();
-    if (!latest) {
-      toast.error("Không tải được bản mới nhất", { description: errorMessage(refetchError) });
+    // A failed refetch still returns the cached (stale) data with isError: it must not count as "the latest".
+    const result = await refetch();
+    const latest = result.data;
+    if (result.isError || !latest) {
+      toast.error("Không tải được bản mới nhất", { description: errorMessage(result.error) });
       return;
     }
     if (applyMine && conflict) save(conflict, latest.revision);
@@ -246,28 +248,33 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-slate-500">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#087EC2] border-t-transparent" />
-          <p className="text-xs">Đang tải dữ liệu bài viết EcoNews...</p>
+  // Only a load that never produced a revision may replace the editor. Once `base` is set, a failed background
+  // refetch (TanStack keeps `data` but sets `error`) is shown in a banner below; the form, Tiptap and every unsaved
+  // field stay mounted.
+  if (!base) {
+    if (!error) {
+      return (
+        <div className="flex h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-2 text-slate-500">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#087EC2] border-t-transparent" />
+            <p className="text-xs">Đang tải dữ liệu bài viết EcoNews...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  if (error || !articleData || !base) {
+      );
+    }
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-8 text-center space-y-3">
         <AlertCircle className="mx-auto h-8 w-8 text-rose-500" />
         <h3 className="text-sm font-bold text-rose-900">Không mở được bài viết</h3>
-        <p className="text-xs text-rose-700">
-          {error ? errorMessage(error) : <>Mã bài viết &quot;{articleId}&quot; không tồn tại trong hệ thống.</>}
-        </p>
-        <Button variant="outline" size="sm" onClick={() => router.push("/content/articles")}>
-          Quay Lại Danh Sách Bài Viết
-        </Button>
+        <p className="text-xs text-rose-700">{errorMessage(error)}</p>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={isFetching} onClick={() => void refetch()}>
+            Thử lại
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push("/content/articles")}>
+            Quay Lại Danh Sách Bài Viết
+          </Button>
+        </div>
       </div>
     );
   }
@@ -405,6 +412,30 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
         </div>
       </div>
 
+      {/* Background refetch failed: the loaded revision and all unsaved edits stay; nothing is overwritten. */}
+      {error && (
+        <div
+          role="alert"
+          data-testid="article-refetch-error"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900"
+        >
+          <span>
+            <strong>Không tải lại được bài viết từ máy chủ.</strong> {errorMessage(error)} Nội dung bạn đang soạn vẫn
+            được giữ nguyên.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            className="h-7 text-xs"
+          >
+            Thử lại
+          </Button>
+        </div>
+      )}
+
       {/* 2. MAIN WORKSPACE: EDITOR & CONTEXTUAL INSPECTOR */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left Column: Main Editor (Col 8 or 12) */}
@@ -427,7 +458,10 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
                 <label className="text-xs font-semibold text-slate-700">
                   Tiêu Đề Bài Viết ({isVi ? "VI" : "EN"}) *
                 </label>
+                {/* key: a fresh DOM input per locale. Re-registering the same uncontrolled input under the other
+                    locale's name keeps showing the previous locale's text (react-hook-form skips an unchanged ref). */}
                 <Input
+                  key={activeLocale}
                   {...register(isVi ? "titleVi" : "titleEn")}
                   placeholder={isVi ? "Nhập tiêu đề bài viết phân tích..." : "Enter English article title..."}
                   className="h-9 text-xs sm:text-sm font-semibold"
@@ -440,6 +474,7 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
                   Đoạn Tóm Tắt / Sa-pô ({isVi ? "VI" : "EN"})
                 </label>
                 <Textarea
+                  key={activeLocale}
                   {...register(isVi ? "excerptVi" : "excerptEn")}
                   placeholder={isVi ? "Tóm tắt 2-3 câu trọng tâm của bài viết để kích thích người đọc..." : "Brief 2-3 sentence article summary..."}
                   rows={2}
@@ -589,6 +624,7 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
                         URL Slug ({isVi ? "VI" : "EN"}) *
                       </label>
                       <Input
+                        key={activeLocale}
                         {...register(isVi ? "slugVi" : "slugEn")}
                         placeholder="slug-bai-viet"
                         className="h-7 text-xs font-mono"
@@ -665,6 +701,7 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
                           </span>
                         </div>
                         <Input
+                          key={activeLocale}
                           {...register(isVi ? "seo.metaTitleVi" : "seo.metaTitleEn")}
                           placeholder="Tiêu đề hiển thị trên Google..."
                           className="h-7 text-xs"
@@ -679,6 +716,7 @@ export function ArticleEditorView({ articleId }: ArticleEditorViewProps) {
                           </span>
                         </div>
                         <Textarea
+                          key={activeLocale}
                           {...register(isVi ? "seo.metaDescriptionVi" : "seo.metaDescriptionEn")}
                           placeholder="Mô tả tóm tắt cho Google SERP..."
                           rows={2}
