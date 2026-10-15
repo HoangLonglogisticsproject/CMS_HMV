@@ -25,6 +25,11 @@ const MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   UNSUPPORTED_MEDIA_TYPE: "Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.",
   PAYLOAD_TOO_LARGE: "Tệp vượt quá dung lượng cho phép.",
   INTERNAL_ERROR: "Máy chủ gặp lỗi. Vui lòng thử lại sau.",
+  CURRENT_PASSWORD_INCORRECT: "Mật khẩu hiện tại không đúng.",
+  USER_NOT_FOUND: "Không tìm thấy người dùng.",
+  EMAIL_TAKEN: "Email này đã có tài khoản. Không thể tạo trùng.",
+  UNKNOWN_ROLE: "Vai trò không hợp lệ.",
+  LAST_ADMIN: "Phải còn ít nhất một quản trị viên đang hoạt động: không thể khoá hoặc hạ quyền tài khoản này.",
 };
 
 const LOCALE_LABEL: Record<string, string> = { vi: "Tiếng Việt", en: "English" };

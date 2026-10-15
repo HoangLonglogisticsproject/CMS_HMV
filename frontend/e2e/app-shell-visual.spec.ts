@@ -4,6 +4,9 @@ import path from "path";
 import { ACTIVE_NAVIGATION_GROUPS, ROADMAP_FEATURES, TARGET_NAVIGATION_IA } from "../src/config/navigation";
 import fs from "fs";
 
+// What the E2E editor holds (EDITOR role); nav items behind other permissions are hidden for it.
+const EDITOR_PERMISSIONS = ["article:read", "article:write", "media:read", "media:write"];
+
 const ARTIFACT_DIR = "C:/Users/ACER/.gemini/antigravity-ide/brain/41a6b2dd-79f1-4d9c-a715-5e0275100df0";
 
 test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () => {
@@ -32,6 +35,11 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
 
       // Verify active indicator in sidebar
       const activeLink = page.locator("aside").getByRole("link", { name: item.title });
+      if (item.permission && !EDITOR_PERMISSIONS.includes(item.permission)) {
+        // Permission-gated route (e.g. user management): an editor reaches the page but gets no sidebar entry.
+        await expect(activeLink).toHaveCount(0);
+        continue;
+      }
       await expect(activeLink).toBeVisible();
       await expect(activeLink).toHaveClass(/bg-\[#E9F7FF\]/);
     }

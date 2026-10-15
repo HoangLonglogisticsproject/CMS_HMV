@@ -99,8 +99,13 @@ test.describe("Authentication (real API + PostgreSQL)", () => {
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
 
-    // Navigate to menu item via ArrowDown and press Enter
-    await page.keyboard.press("ArrowDown");
+    // Reach "Đăng xuất" (after "Đổi mật khẩu") with ArrowDown only. Radix focuses either the menu or its first item
+    // when opened with Enter, so step until the logout item has focus, then assert it.
+    const logoutItem = page.getByRole("menuitem", { name: "Đăng xuất" });
+    for (let i = 0; i < 3 && !(await logoutItem.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press("ArrowDown");
+    }
+    await expect(logoutItem).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(/\/login/);

@@ -12,6 +12,12 @@ export const queryKeys = {
     preview: (id: string, locale: string) => ["articles", "preview", id, locale] as const,
     categories: ["articles", "categories"] as const,
   },
+  users: {
+    all: ["users"] as const,
+    list: ["users", "list"] as const,
+    roles: ["users", "roles"] as const,
+    events: ["users", "security-events"] as const,
+  },
   media: {
     all: ["media"] as const,
     lists: ["media", "list"] as const,

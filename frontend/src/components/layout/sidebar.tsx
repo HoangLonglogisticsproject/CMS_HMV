@@ -215,15 +215,15 @@ export function Sidebar({
               className="h-8 w-8 rounded-full bg-[#E9F7FF] border border-[#bae6fd] flex items-center justify-center text-xs font-bold text-[#0066CC] shrink-0 select-none shadow-2xs"
               title={session?.user.displayName ?? "User"}
             >
-              {session?.user.displayName ? session.user.displayName.slice(0, 1).toUpperCase() : "H"}
+              {session?.user.displayName ? session.user.displayName.slice(0, 1).toUpperCase() : "?"}
             </div>
             {!isRail && (
               <div className="overflow-hidden min-w-0 flex-1">
                 <p className="text-xs font-semibold text-slate-800 truncate leading-tight">
-                  {session?.user.displayName || "Admin User"}
+                  {session?.user.displayName ?? "Phiên đã hết hạn"}
                 </p>
                 <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5 font-mono">
-                  {session?.user.email || "admin@hmv.local"}
+                  {session?.user.email ?? ""}
                 </p>
               </div>
             )}

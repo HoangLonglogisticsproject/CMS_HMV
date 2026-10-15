@@ -184,9 +184,8 @@ export const TARGET_NAVIGATION_IA: NavGroupConfig[] = [
         title: "Người dùng & phân quyền",
         href: "/admin/users",
         icon: Users,
-        isActiveRoute: false,
-        roadmapDescription: "Quản trị danh sách nhân sự, phân nhóm quyền RBAC và lịch sử hoạt động.",
-        targetMilestone: "Milestone Q4-AdminRBAC",
+        permission: "user:manage",
+        isActiveRoute: true,
       },
       {
         id: "settings",

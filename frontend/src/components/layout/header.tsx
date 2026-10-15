@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Shield,
   Search,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLogout, useSession } from "@/modules/auth/queries/use-session";
+import { ChangePasswordDialog } from "@/modules/auth/components/change-password-dialog";
+
+/** Shown instead of any identity while the session is gone (AuthGate keeps the screen for re-login). */
+const EXPIRED = "Phiên đã hết hạn";
 
 /** "Nguyễn Hoàng Long" → "NL", "Quản trị viên" → "QV" */
 export function initials(name = "") {
@@ -46,6 +51,7 @@ export function Header({ collapsed, onToggleCollapse, onOpenMobileNav }: HeaderP
   const pathname = usePathname();
   const { data: session } = useSession();
   const logout = useLogout();
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Compute breadcrumb / page context from pathname
   const pageBreadcrumbs = useMemo(() => {
@@ -177,14 +183,14 @@ export function Header({ collapsed, onToggleCollapse, onOpenMobileNav }: HeaderP
               aria-label="Tài khoản người dùng"
             >
               <div className="h-7 w-7 rounded-full bg-[#0066CC] text-white flex items-center justify-center text-xs font-bold shadow-2xs shrink-0 select-none">
-                {initials(session?.user.displayName || "HMV Administrator")}
+                {initials(session?.user.displayName ?? "")}
               </div>
               <div className="hidden sm:flex flex-col text-left max-w-[130px] lg:max-w-[160px]">
                 <span className="text-xs font-semibold text-slate-700 truncate leading-tight">
-                  {session?.user.displayName || "HMV Administrator"}
+                  {session?.user.displayName ?? EXPIRED}
                 </span>
                 <span className="text-[10px] text-slate-400 truncate leading-tight font-mono mt-0.5">
-                  {session?.user.roles?.[0] || "ADMIN"}
+                  {session?.user.roles[0] ?? ""}
                 </span>
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400 hidden sm:block shrink-0" />
@@ -193,20 +199,31 @@ export function Header({ collapsed, onToggleCollapse, onOpenMobileNav }: HeaderP
           <DropdownMenuContent align="end" className="w-60 sm:w-64 p-1.5">
             <div className="px-3 py-2 border-b border-slate-100">
               <p className="text-xs font-bold text-slate-900 leading-tight">
-                {session?.user.displayName || "HMV Administrator"}
+                {session?.user.displayName ?? EXPIRED}
               </p>
               <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">
-                {session?.user.email || "admin@hmv.local"}
+                {session?.user.email ?? ""}
               </p>
-              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                <Badge variant="outline" className="text-[10px] bg-sky-50 text-[#0066CC] border-[#bae6fd] font-semibold gap-1 py-0.5">
-                  <Shield className="h-3 w-3" />
-                  <span>{session?.user.roles?.join(", ") || "ADMIN"}</span>
-                </Badge>
-              </div>
+              {session && session.user.roles.length > 0 && (
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] bg-sky-50 text-[#0066CC] border-[#bae6fd] font-semibold gap-1 py-0.5">
+                    <Shield className="h-3 w-3" />
+                    <span>{session.user.roles.join(", ")}</span>
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <div className="p-1">
+              {session && (
+                <DropdownMenuItem
+                  className="text-xs text-slate-700 cursor-pointer gap-2 py-2 font-medium rounded-md"
+                  onSelect={() => setChangingPassword(true)}
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Đổi mật khẩu</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-xs text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer gap-2 py-2 font-medium rounded-md"
                 disabled={logout.isPending}
@@ -218,6 +235,7 @@ export function Header({ collapsed, onToggleCollapse, onOpenMobileNav }: HeaderP
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ChangePasswordDialog open={changingPassword} onOpenChange={setChangingPassword} />
       </div>
     </header>
   );

@@ -20,6 +20,7 @@ export const E2E = {
     editor2: { email: "editor2@e2e.test", name: "Biên Tập Viên Hai", roles: ["EDITOR"] },
     reviewer: { email: "reviewer@e2e.test", name: "Người Duyệt E2E", roles: ["REVIEWER"] },
     viewer: { email: "viewer@e2e.test", name: "Người Xem E2E", roles: ["VIEWER"] },
+    admin: { email: "admin@e2e.test", name: "Quản Trị E2E", roles: ["ADMIN"] },
   },
 } as const;
 

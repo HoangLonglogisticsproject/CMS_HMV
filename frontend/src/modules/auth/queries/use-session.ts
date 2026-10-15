@@ -65,3 +65,11 @@ export function useLogout() {
     },
   });
 }
+
+/** Self-service change. This session stays signed in; the API revokes the user's other sessions. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      call(api.POST("/api/v1/auth/password", { body })),
+  });
+}
