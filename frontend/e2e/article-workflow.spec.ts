@@ -143,6 +143,8 @@ test("archive hides the article from the public API until restored", async ({ pa
   await loginViaUi(page, "reviewer", `/content/articles/${created.id}`);
   page.once("dialog", (d) => void d.accept());
   await button(page, "Lưu trữ").click();
+  // Wait for the archive request itself: the status text below also matches the "Lưu trữ" button that was just clicked.
+  await expect(toast(page, "Đã lưu trữ bài viết")).toBeVisible();
   await expect(page.getByTestId("article-workflow").getByText("Lưu trữ", { exact: true })).toBeVisible();
   expect((await pub.get(`/api/v1/public/articles/${slug}?locale=vi`)).status()).toBe(404);
   await button(page, "Bỏ lưu trữ").click();
