@@ -16,6 +16,7 @@ import {
   useRestoreArticle,
 } from "../queries/use-articles";
 import { EDITOR_LOCALES, translationOf } from "../utils/article-form";
+import { getArticlePublishReadiness, liveApprovalReason } from "../utils/publish-readiness";
 
 interface ArticleWorkflowPanelProps {
   article: ArticleDetail;
@@ -38,10 +39,8 @@ export function ArticleWorkflowPanel({ article, isDirty, onChanged }: ArticleWor
 
   const archived = article.status === "ARCHIVED";
   const blocked = isDirty || archived || busy;
-  const liveNeedingApproval = article.translations.filter((t) => t.isLive && t.reviewStatus !== "APPROVED");
-  const hasSomethingToPublish = article.translations.some(
-    (t) => t.reviewStatus === "APPROVED" && (!t.isLive || t.hasUnpublishedChanges),
-  );
+  const canPublish = can("article:publish");
+  const readiness = getArticlePublishReadiness(article, { canPublish, hasUnsavedEdits: isDirty });
 
   const done = (message: string) => ({
     onSuccess: (updated: ArticleDetail) => {
@@ -110,20 +109,24 @@ export function ArticleWorkflowPanel({ article, isDirty, onChanged }: ArticleWor
         );
       })}
 
-      {liveNeedingApproval.length > 0 && (
-        <p className="text-[10px] text-amber-700">
-          Bản đang công khai ({liveNeedingApproval.map((t) => t.locale.toUpperCase()).join(", ")}) đã được sửa: cần duyệt
-          lại trước khi xuất bản.
+      {readiness.liveNeedingApproval.length > 0 && (
+        <p className="text-[10px] text-amber-700" data-testid="publish-blocked-reason">
+          {liveApprovalReason(readiness.liveNeedingApproval)}
+        </p>
+      )}
+      {canPublish && (readiness.blocker === "NOTHING_APPROVED" || readiness.blocker === "NOTHING_TO_PUBLISH") && (
+        <p className="text-[10px] text-slate-500" data-testid="publish-blocked-reason">
+          {readiness.reason}
         </p>
       )}
 
       <div className="flex gap-1.5 pt-1">
-        {can("article:publish") && !archived && (
+        {canPublish && !archived && (
           <Button
             type="button"
             size="sm"
             className="h-7 flex-1 text-xs bg-[#087EC2] hover:bg-[#066ba8] text-white"
-            disabled={blocked || !hasSomethingToPublish || liveNeedingApproval.length > 0}
+            disabled={busy || !readiness.canPublish}
             onClick={() => {
               if (confirm("Xuất bản bản nháp này? Mọi bản dịch đã duyệt sẽ hiển thị công khai.")) {
                 publish.mutate({ id: article.id, expectedRevision: article.revision }, done("Đã xuất bản bài viết"));

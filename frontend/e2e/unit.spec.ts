@@ -12,6 +12,7 @@ import {
   toContents,
   toFormValues,
 } from "@/modules/content/articles/utils/article-form";
+import { getArticlePublishReadiness } from "@/modules/content/articles/utils/publish-readiness";
 
 const doc = (text: string, extra: object[] = []) => ({
   type: "doc",
@@ -129,4 +130,70 @@ test("avatar initials use letters only", () => {
   expect(initials("Quản trị viên (local)")).toBe("QL");
   expect(initials("Admin")).toBe("A");
   expect(initials("")).toBe("?");
+});
+
+test.describe("getArticlePublishReadiness (mirrors ArticlesService.publish)", () => {
+  type Input = Parameters<typeof getArticlePublishReadiness>[0];
+  // Same derivation as the API: not live => hasUnpublishedChanges; approval binds to the current content hash.
+  const tr = (locale: string, s: { approved?: boolean; live?: boolean; edited?: boolean } = {}) => ({
+    locale,
+    reviewStatus: s.approved ? "APPROVED" : "UNREVIEWED",
+    isLive: Boolean(s.live),
+    hasUnpublishedChanges: !s.live || Boolean(s.edited),
+    isOutdated: false,
+  });
+  const article = (status: string, revisionAhead: boolean, ...translations: ReturnType<typeof tr>[]) =>
+    ({ status, hasUnpublishedChanges: revisionAhead, translations }) as unknown as Input;
+  const publisher = { canPublish: true };
+
+  test("new article: VI approved, EN not -> publish VI, EN stays a draft", () => {
+    const r = getArticlePublishReadiness(article("DRAFT", false, tr("vi", { approved: true }), tr("en")), publisher);
+    expect(r).toMatchObject({ canPublish: true, blocker: null, goingLive: ["vi"], newLocales: ["vi"], staysDraft: ["en"] });
+  });
+
+  test("A. published, nothing new -> no-op is not offered (status PUBLISHED alone is not the reason)", () => {
+    const r = getArticlePublishReadiness(article("PUBLISHED", false, tr("vi", { approved: true, live: true })), publisher);
+    expect(r).toMatchObject({ canPublish: false, blocker: "NOTHING_TO_PUBLISH" });
+    expect(r.reason).toContain("Không có thay đổi mới");
+  });
+
+  test("B. published, a newer approved revision of a live locale -> publishable", () => {
+    const r = getArticlePublishReadiness(article("PUBLISHED", true, tr("vi", { approved: true, live: true, edited: true })), publisher);
+    expect(r).toMatchObject({ canPublish: true, newLocales: [] });
+  });
+
+  test("C. published, a new locale approved (no new revision) -> publishable", () => {
+    const r = getArticlePublishReadiness(
+      article("PUBLISHED", false, tr("vi", { approved: true, live: true }), tr("en", { approved: true })),
+      publisher,
+    );
+    expect(r).toMatchObject({ canPublish: true, newLocales: ["en"], goingLive: ["vi", "en"] });
+  });
+
+  test("D. a live locale edited without re-approval blocks publishing, even with another locale approved", () => {
+    const r = getArticlePublishReadiness(
+      article("PUBLISHED", true, tr("vi", { live: true, edited: true }), tr("en", { approved: true })),
+      publisher,
+    );
+    expect(r).toMatchObject({ canPublish: false, blocker: "LIVE_LOCALE_UNAPPROVED", liveNeedingApproval: ["vi"] });
+    expect(r.reason).toBe("Bản đang công khai (VI) đã được sửa: cần duyệt lại trước khi xuất bản.");
+  });
+
+  test("an approval made stale by an edit leaves nothing approved", () => {
+    const r = getArticlePublishReadiness(article("DRAFT", false, tr("vi"), tr("en")), publisher);
+    expect(r).toMatchObject({ canPublish: false, blocker: "NOTHING_APPROVED", staysDraft: ["vi", "en"] });
+  });
+
+  test("article-level change only (category, cover, author, featured) on a published article -> publishable", () => {
+    const r = getArticlePublishReadiness(article("PUBLISHED", true, tr("vi", { approved: true, live: true })), publisher);
+    expect(r.canPublish).toBe(true);
+  });
+
+  test("permission, archive and unsaved edits come first", () => {
+    const ready = article("DRAFT", false, tr("vi", { approved: true }));
+    expect(getArticlePublishReadiness(ready, { canPublish: false }).blocker).toBe("NO_PERMISSION");
+    expect(getArticlePublishReadiness({ ...ready, status: "ARCHIVED" }, publisher).blocker).toBe("ARCHIVED");
+    expect(getArticlePublishReadiness(ready, { canPublish: true, hasUnsavedEdits: true }).blocker).toBe("UNSAVED_EDITS");
+    expect(getArticlePublishReadiness(ready, publisher)).toMatchObject({ canPublish: true, reason: null });
+  });
 });

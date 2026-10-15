@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, call, isApiError, type Schemas } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -100,10 +101,29 @@ export const useApproveTranslation = () =>
     ),
   );
 
-export const usePublishArticle = () =>
-  useArticleWrite(({ id, expectedRevision }: { id: string; expectedRevision: number }) =>
+/**
+ * One publish request at a time. `isPending` only disables the button on the next render, so a double click sent two
+ * requests: the second answered 409, and TanStack runs only the latest call's callbacks, so a successful publish was
+ * reported as a failure. The ref blocks the second call synchronously.
+ */
+export function usePublishArticle() {
+  const mutation = useArticleWrite(({ id, expectedRevision }: { id: string; expectedRevision: number }) =>
     call(api.POST("/api/v1/admin/articles/{id}/publish", { params: { path: { id } }, body: { expectedRevision } })),
   );
+  const inFlight = useRef(false);
+  const mutate: typeof mutation.mutate = (variables, options) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    mutation.mutate(variables, {
+      ...options,
+      onSettled: (...args) => {
+        inFlight.current = false;
+        options?.onSettled?.(...args);
+      },
+    });
+  };
+  return { ...mutation, mutate };
+}
 
 export const useArchiveArticle = () =>
   useArticleWrite((id: string) => call(api.POST("/api/v1/admin/articles/{id}/archive", { params: { path: { id } } })));

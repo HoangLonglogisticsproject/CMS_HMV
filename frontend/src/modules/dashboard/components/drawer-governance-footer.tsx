@@ -9,6 +9,7 @@ import {
   Send,
 } from "lucide-react";
 import type { Schemas } from "@/lib/api/client";
+import { getArticlePublishReadiness } from "@/modules/content/articles/utils/publish-readiness";
 
 type ArticleDetail = Schemas["ArticleDetailResponse"];
 
@@ -37,17 +38,12 @@ export function DrawerGovernanceFooter({
   const isCurrentLocaleApproved = currentTranslation?.reviewStatus === "APPROVED";
   const isArchived = article?.status === "ARCHIVED";
 
-  const hasApprovedTranslation = Boolean(
-    article?.translations.some((t) => t.reviewStatus === "APPROVED"),
-  );
-  const liveNeedingApproval =
-    article?.translations.filter((t) => t.isLive && t.reviewStatus !== "APPROVED") ?? [];
+  // Same rule as the Article Editor (the API stays authoritative).
+  const readiness = article ? getArticlePublishReadiness(article, { canPublish }) : null;
+  const liveNeedingApproval = readiness?.liveNeedingApproval ?? [];
 
   const canReviewCurrentLocale =
     canReview && Boolean(currentTranslation) && !isCurrentLocaleApproved && !isArchived;
-
-  const canPublishArticle =
-    canPublish && !isArchived && hasApprovedTranslation && liveNeedingApproval.length === 0;
 
   return (
     <div className="p-4 sm:p-5 border-t border-slate-200 bg-white/95 backdrop-blur-md sticky bottom-0 z-10 space-y-2.5">
@@ -57,7 +53,7 @@ export function DrawerGovernanceFooter({
           <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
           <span>
             Bản dịch đang trực tuyến (
-            <strong>{liveNeedingApproval.map((t) => t.locale.toUpperCase()).join(", ")}</strong>
+            <strong>{liveNeedingApproval.map((l) => l.toUpperCase()).join(", ")}</strong>
             ) đã có cập nhật mới chưa được duyệt: cần duyệt lại trước khi xuất bản bản sửa đổi.
           </span>
         </div>
@@ -119,14 +115,8 @@ export function DrawerGovernanceFooter({
               size="sm"
               data-testid="drawer-publish-btn"
               className="h-9 px-4 text-xs font-medium bg-[#0066CC] hover:bg-[#0052A3] text-white gap-1.5 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
-              disabled={isBusy || !canPublishArticle}
-              title={
-                !hasApprovedTranslation
-                  ? "Cần ít nhất một bản dịch đã được duyệt để xuất bản"
-                  : liveNeedingApproval.length > 0
-                  ? "Bản dịch đang trực tuyến có cập nhật mới chưa được duyệt"
-                  : "Xuất bản bài viết lên website công khai"
-              }
+              disabled={isBusy || !readiness?.canPublish}
+              title={readiness?.reason ?? "Xuất bản bài viết lên website công khai"}
               onClick={onRequestPublish}
             >
               <Send className="h-3.5 w-3.5" />
@@ -135,6 +125,14 @@ export function DrawerGovernanceFooter({
           )}
         </div>
       </div>
+      {canPublish &&
+        (readiness?.blocker === "NOTHING_APPROVED" ||
+          readiness?.blocker === "NOTHING_TO_PUBLISH" ||
+          readiness?.blocker === "ARCHIVED") && (
+          <p className="text-[11px] text-slate-500 sm:text-right" data-testid="publish-blocked-reason">
+            {readiness.reason}
+          </p>
+        )}
     </div>
   );
 }
