@@ -9,7 +9,7 @@ Integration contract: [`../docs/api/admin-integration-contract.md`](../docs/api/
 ```bash
 docker compose up -d postgres                  # repo root (Postgres on :5442)
 pnpm --filter backend db:migrate && pnpm --filter backend build
-HMV_USER_PASSWORD='<password>' pnpm --filter backend user:create --email you@hmv.vn --name "Tên" --role ADMIN
+pnpm --filter backend user:create --email you@hmv.vn --name "Tên" --role ADMIN   # prompts for the password
 pnpm --filter backend start:dev                # API on :4000
 cp frontend/.env.example frontend/.env.local   # NEXT_PUBLIC_API_URL=http://localhost:4000
 pnpm --filter frontend dev                     # CMS on :3000 → /login

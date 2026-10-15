@@ -7,6 +7,21 @@ const R = 8;
 const P = 3;
 const KEY_LENGTH = 64;
 
+/** Password policy shared by the API DTOs and the user CLIs. Length only (NIST 800-63B): no composition rules. */
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 1024;
+
+/** Returns why `password` is not acceptable as a new password, or null. */
+export function passwordProblem(password: string | undefined): string | null {
+  if (!password || password.length < PASSWORD_MIN_LENGTH)
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+  if (password.length > PASSWORD_MAX_LENGTH)
+    return `Password must be at most ${PASSWORD_MAX_LENGTH} characters`;
+  if (password.trim() !== password)
+    return 'Password must not start or end with whitespace';
+  return null;
+}
+
 function derive(
   password: string,
   salt: Buffer,

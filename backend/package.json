@@ -22,6 +22,8 @@
     "openapi:export": "nest build && node dist/scripts/export-openapi.js",
     "db:migrate": "prisma migrate deploy",
     "user:create": "node dist/scripts/create-user.js",
+    "user:reset-password": "node dist/scripts/reset-password.js",
+    "user:list": "node dist/scripts/list-users.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

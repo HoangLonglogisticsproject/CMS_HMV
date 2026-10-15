@@ -1,21 +1,24 @@
-// Creates a CMS user, or resets an existing user's password/roles. There is no user-management API yet.
+// Creates a NEW CMS user. It never modifies an existing account: an email that already exists is refused.
+// Password changes go through `pnpm user:reset-password` (or the admin API / self-service change).
 //
-//   HMV_USER_PASSWORD='…' pnpm user:create --email admin@hmv.vn --name "Quản trị viên" --role ADMIN
-//   echo '…' | pnpm user:create --email editor@hmv.vn --name "Biên tập" --role EDITOR --role REVIEWER
+//   pnpm --filter backend user:create --email editor@hmv.vn --name "Biên tập" --role EDITOR [--role REVIEWER]
 //
-// The password comes from HMV_USER_PASSWORD or the first line of stdin, never from argv (shell history).
-// Uses DATABASE_URL from the environment or .env.
-import { PrismaClient } from '@prisma/client';
+// The password is typed at a hidden prompt, or comes from HMV_USER_PASSWORD / the first line of stdin for automation;
+// never from argv (shell history). Uses DATABASE_URL from the environment or backend/.env.
+import { Prisma, PrismaClient } from '@prisma/client';
 import { parseArgs } from 'node:util';
 import { hashPassword } from '../modules/auth/password';
+import {
+  describeTarget,
+  fail,
+  loadEnv,
+  looksLikeEmail,
+  normalizeEmail,
+  readNewPassword,
+} from './cli';
 
 async function main() {
-  try {
-    process.loadEnvFile('.env');
-  } catch {
-    // no .env file: rely on the environment
-  }
-
+  loadEnv();
   const { values } = parseArgs({
     options: {
       email: { type: 'string' },
@@ -23,57 +26,46 @@ async function main() {
       role: { type: 'string', multiple: true },
     },
   });
-  const email = values.email?.trim().toLowerCase();
-  const roles = values.role ?? [];
-  if (!email || !values.name || roles.length === 0) {
-    console.error(
+  const email = normalizeEmail(values.email ?? '');
+  const name = values.name?.trim();
+  const roles = [...new Set(values.role ?? [])];
+  if (!email || !name || roles.length === 0)
+    fail(
       'Usage: pnpm user:create --email <email> --name <display name> --role <ROLE> [--role <ROLE>…]',
     );
-    process.exit(1);
-  }
+  if (!looksLikeEmail(email)) fail(`"${email}" is not a valid email address`);
+  if (name.length > 120) fail('Display name must be at most 120 characters');
 
-  let password = process.env.HMV_USER_PASSWORD;
-  if (!password) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-    password = Buffer.concat(chunks).toString('utf8').split(/\r?\n/)[0];
-  }
-  if (!password || password.length < 12) {
-    console.error(
-      'Password must be at least 12 characters (HMV_USER_PASSWORD or stdin).',
-    );
-    process.exit(1);
-  }
-
+  console.log(`Target database: ${describeTarget()}`);
   const prisma = new PrismaClient();
   try {
-    const known = await prisma.role.findMany({
-      where: { code: { in: roles } },
-    });
+    const known = await prisma.role.findMany({ select: { code: true } });
     const unknown = roles.filter((r) => !known.some((k) => k.code === r));
     if (unknown.length)
-      throw new Error(
-        `Unknown role(s): ${unknown.join(', ')}. Known: ${(await prisma.role.findMany()).map((r) => r.code).join(', ')}`,
+      fail(
+        `Unknown role(s): ${unknown.join(', ')}. Known: ${known.map((k) => k.code).join(', ')}`,
+      );
+    if (
+      await prisma.user.findUnique({ where: { email }, select: { id: true } })
+    )
+      fail(
+        `User ${email} already exists; nothing changed. Use "pnpm user:reset-password" to set a new password.`,
       );
 
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(await readNewPassword());
+    // The unique email constraint makes a concurrent run fail here instead of creating a second account.
     const user = await prisma.$transaction(async (tx) => {
-      const u = await tx.user.upsert({
-        where: { email },
-        create: { email, displayName: values.name!, passwordHash },
-        update: { displayName: values.name!, passwordHash, isActive: true },
-      });
-      await tx.userRole.deleteMany({ where: { userId: u.id } });
-      await tx.userRole.createMany({
-        data: roles.map((roleCode) => ({ userId: u.id, roleCode })),
-      });
-      await tx.session.updateMany({
-        where: { userId: u.id, revokedAt: null },
-        data: { revokedAt: new Date() },
+      const u = await tx.user.create({
+        data: {
+          email,
+          displayName: name,
+          passwordHash,
+          roles: { create: roles.map((roleCode) => ({ roleCode })) },
+        },
       });
       await tx.auditLog.create({
         data: {
-          action: 'user.provision',
+          action: 'user.create',
           entityType: 'user',
           entityId: u.id,
           metadata: { email, roles, via: 'cli' },
@@ -82,11 +74,15 @@ async function main() {
       return u;
     });
     console.log(
-      `User ${user.email} (${user.id}) ready with roles: ${roles.join(', ')}`,
+      `Created ${user.email} (${user.id}) with roles: ${roles.join(', ')}`,
     );
   } catch (err) {
-    console.error((err as Error).message);
-    process.exitCode = 1;
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    )
+      fail(`User ${email} already exists; nothing changed.`);
+    fail((err as Error).message);
   } finally {
     await prisma.$disconnect();
   }

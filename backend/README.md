@@ -15,7 +15,7 @@ cp backend/.env.example backend/.env    # then adjust
 pnpm install
 pnpm --filter backend db:migrate        # prisma migrate deploy
 pnpm --filter backend build
-HMV_USER_PASSWORD='<password>' pnpm --filter backend user:create --email you@hmv.vn --name "Tên" --role ADMIN
+pnpm --filter backend user:create --email you@hmv.vn --name "Tên" --role ADMIN   # first admin; prompts for the password
 pnpm --filter backend start:dev         # http://localhost:4000/api/v1, Swagger UI at /docs (non-production)
 ```
 
@@ -29,7 +29,9 @@ pnpm --filter backend start:dev         # http://localhost:4000/api/v1, Swagger 
 | `test` | Unit tests (rich-content validator, image sniffing) |
 | `test:e2e` | Build, migrate the `*_test` database, export OpenAPI, run integration tests against PostgreSQL |
 | `openapi:export` | Write `../docs/api/openapi-spec.json` |
-| `user:create` | Create a user / reset password and roles (password from `HMV_USER_PASSWORD` or stdin) |
+| `user:create` | Create a NEW user (refuses an existing email; never overwrites). Password at a hidden prompt, or `HMV_USER_PASSWORD`/stdin for automation |
+| `user:reset-password` | Set a new password for one existing user and revoke its sessions (asks for confirmation; `--yes` when non-interactive) |
+| `user:list` | Read-only list of accounts, roles, last login and active sessions (no hashes) |
 | `lint`, `typecheck` | oxlint, `tsc --noEmit` |
 
 New migration: edit `prisma/schema.prisma`, then `npx prisma migrate dev --name <change> --create-only`,
