@@ -204,11 +204,11 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
     });
   });
 
-  test("5. Admin User Account Dropdown (HMV Administrator / admin@hmv.local / ADMIN)", async ({ page }) => {
+  test("5. Admin account dropdown shows the session's own name, email and role", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginViaUi(page, "editor", "/");
 
-    // Mock session for HMV Administrator
+    // Mocked admin session (test identity, never a real account)
     await page.route("**/api/v1/auth/session", async (route) => {
       await route.fulfill({
         status: 200,
@@ -216,10 +216,10 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
         body: JSON.stringify({
           user: {
             id: "admin-uuid-001",
-            email: "admin@hmv.local",
-            displayName: "HMV Administrator",
+            email: "admin@e2e.test",
+            displayName: "Quản Trị Viên",
             roles: ["ADMIN"],
-            permissions: ["article:create", "article:edit", "article:review", "article:publish", "media:upload", "media:delete", "user:manage"],
+            permissions: ["article:archive", "article:publish", "article:read", "article:review", "article:write", "media:read", "media:write", "user:manage"],
           },
           csrfToken: "mock-admin-csrf-token",
         }),
@@ -230,11 +230,11 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
     await expect(page.getByRole("heading", { name: "Tổng quan & Điều hành nội dung" })).toBeVisible();
 
 
-    // Verify trigger contains avatar "HA", display name "HMV Administrator", role "ADMIN"
+    // Trigger shows the session's initials, name and role
     const trigger = page.getByRole("button", { name: "Tài khoản người dùng" });
     await expect(trigger).toBeVisible();
-    await expect(trigger.getByText("HA")).toBeVisible();
-    await expect(trigger.getByText("HMV Administrator")).toBeVisible();
+    await expect(trigger.getByText("QV")).toBeVisible();
+    await expect(trigger.getByText("Quản Trị Viên")).toBeVisible();
     await expect(trigger.getByText("ADMIN", { exact: true })).toBeVisible();
 
 
@@ -253,8 +253,8 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
     await expect(menu).toBeVisible();
 
     // Verify structure exactly as required by user
-    await expect(menu.getByText("HMV Administrator")).toBeVisible();
-    await expect(menu.getByText("admin@hmv.local")).toBeVisible();
+    await expect(menu.getByText("Quản Trị Viên")).toBeVisible();
+    await expect(menu.getByText("admin@e2e.test")).toBeVisible();
     await expect(menu.getByText("ADMIN", { exact: true })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: "Đăng xuất" })).toBeVisible();
 

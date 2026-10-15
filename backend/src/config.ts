@@ -24,6 +24,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       'CORS_ORIGIN must list the CMS frontend origin(s) in production',
     );
   }
+  if (isProduction) {
+    // The production session cookie is __Host- + Secure: a plain-http or localhost origin would make every sign-in
+    // silently fail (or point the CMS at a developer machine). Refuse to start instead.
+    const isLocal = (url: string) =>
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url);
+    const bad = corsOrigins.filter(
+      (o) => isLocal(o) || !o.startsWith('https://'),
+    );
+    if (bad.length)
+      throw new Error(
+        `CORS_ORIGIN must list https origins that are not localhost in production (got ${bad.join(', ')})`,
+      );
+    if (!env.MEDIA_PUBLIC_BASE_URL || isLocal(env.MEDIA_PUBLIC_BASE_URL))
+      throw new Error(
+        'MEDIA_PUBLIC_BASE_URL must be set to the public media URL in production',
+      );
+  }
   const driver = env.STORAGE_DRIVER ?? 'local';
   if (driver !== 'local' && driver !== 'r2')
     throw new Error(`Unknown STORAGE_DRIVER "${driver}"`);

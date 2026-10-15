@@ -107,3 +107,78 @@ describe('Account security: password change (PostgreSQL)', () => {
     await login(me.user.email, PASSWORD).expect(200); // unchanged
   });
 });
+
+describe('Account security: restarts and rate-limit windows (PostgreSQL)', () => {
+  it('a backend restart changes no credentials; live sessions survive, revoked ones stay dead', async () => {
+    const first = await setupApp();
+    await first.reset();
+    const user = await first.createUser(['EDITOR']);
+    const signIn = () =>
+      request(first.http)
+        .post('/api/v1/auth/login')
+        .send({ email: user.email, password: PASSWORD })
+        .expect(200);
+    const cookieOf = (res: request.Response) =>
+      (res.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
+    const live = cookieOf(await signIn());
+    const revoked = cookieOf(await signIn());
+    const { csrfToken } = (
+      await request(first.http)
+        .get('/api/v1/auth/session')
+        .set('Cookie', revoked)
+        .expect(200)
+    ).body;
+    await request(first.http)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', revoked)
+      .set('X-CSRF-Token', csrfToken)
+      .expect(204);
+    const before = await first.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+    });
+    await first.app.close();
+
+    const second = await setupApp(); // a fresh process-equivalent: new Nest app, new limiters
+    try {
+      const after = await second.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(after.passwordHash).toBe(before.passwordHash);
+      expect(after.updatedAt).toEqual(before.updatedAt);
+      await request(second.http)
+        .get('/api/v1/auth/session')
+        .set('Cookie', live)
+        .expect(200);
+      await request(second.http)
+        .get('/api/v1/auth/session')
+        .set('Cookie', revoked)
+        .expect(401);
+      await request(second.http)
+        .post('/api/v1/auth/login')
+        .send({ email: user.email, password: PASSWORD })
+        .expect(200);
+    } finally {
+      await second.app.close();
+    }
+  });
+
+  it('after the 15-minute window a rate-limited account can sign in again', async () => {
+    const t = await setupApp();
+    try {
+      await t.reset();
+      const user = await t.createUser(['EDITOR']);
+      const login = (password: string) =>
+        request(t.http)
+          .post('/api/v1/auth/login')
+          .send({ email: user.email, password });
+      vi.useFakeTimers({ toFake: ['Date'] }); // only the clock: I/O timers keep running
+      for (let i = 0; i < 5; i++) await login('wrong').expect(401);
+      await login(PASSWORD).expect(429);
+      vi.setSystemTime(Date.now() + 15 * 60_000 + 1_000);
+      await login(PASSWORD).expect(200);
+    } finally {
+      vi.useRealTimers();
+      await t.app.close();
+    }
+  });
+});
