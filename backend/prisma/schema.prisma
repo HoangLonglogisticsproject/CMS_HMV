@@ -1,0 +1,486 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// 1. Locales
+// ----------------------------------------------------
+/// Locales are rows, not columns or enum values: adding a locale is an INSERT, not a schema migration.
+model Locale {
+  code     String  @id // BCP 47, e.g. "vi", "en"
+  name     String
+  isActive Boolean @default(true)
+
+  articleTranslations     ArticleRevisionTranslation[]
+  articleApprovals        ArticleTranslationApproval[]
+  articlePublishedLocales ArticlePublishedLocale[]
+  articleSlugs            ArticleSlug[]
+  categoryTranslations    ArticleCategoryTranslation[]
+  mediaTranslations       MediaAssetTranslation[]
+
+  @@map("locales")
+}
+
+// ----------------------------------------------------
+// 2. Identity, RBAC, Sessions, Audit
+// ----------------------------------------------------
+model User {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String    @unique // stored lower-cased
+  passwordHash String
+  displayName  String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roles            UserRole[]
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  articlesCreated  Article[]                    @relation("ArticleCreatedBy")
+  articlesArchived Article[]                    @relation("ArticleArchivedBy")
+  revisions        ArticleRevision[]
+  approvals        ArticleTranslationApproval[]
+  mediaUploaded    MediaAsset[]
+
+  @@map("users")
+}
+
+model Role {
+  code        String  @id // e.g. "ADMIN", "EDITOR"
+  name        String
+  description String?
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+/// Permission codes are checked by the API (e.g. "article:publish"); roles only group them.
+model Permission {
+  code        String @id
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleCode       String
+  permissionCode String
+
+  role       Role       @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+
+  @@id([roleCode, permissionCode])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleCode   String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleCode], references: [code])
+
+  @@id([userId, roleCode])
+  @@map("user_roles")
+}
+
+model Session {
+  id        String    @id // SHA-256 of the cookie token; the raw token is never stored
+  userId    String    @db.Uuid
+  csrfToken String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String // e.g. "article.publish", "auth.login_failed"
+  entityType String // e.g. "article", "media", "session"
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ----------------------------------------------------
+// 3. Articles (EcoNews)
+// ----------------------------------------------------
+model ArticleCategory {
+  code      String  @id // stable code, e.g. "SUPPLY_CHAIN_INSIGHTS"; labels live in translations
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  translations ArticleCategoryTranslation[]
+  revisions    ArticleRevision[]
+
+  @@map("article_categories")
+}
+
+model ArticleCategoryTranslation {
+  categoryCode String
+  locale       String
+  name         String
+
+  category  ArticleCategory @relation(fields: [categoryCode], references: [code], onDelete: Cascade)
+  localeRef Locale          @relation(fields: [locale], references: [code])
+
+  @@id([categoryCode, locale])
+  @@map("article_category_translations")
+}
+
+/// Stable identity. Content lives in immutable revisions; this row only points at them.
+model Article {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  draftRevisionId     String?   @unique @db.Uuid // latest revision; every save inserts a new one
+  publishedRevisionId String?   @unique @db.Uuid // revision served publicly; null = never published
+  firstPublishedAt    DateTime?
+  lastPublishedAt     DateTime?
+  archivedAt          DateTime?
+  archivedById        String?   @db.Uuid
+  createdById         String    @db.Uuid
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  draftRevision     ArticleRevision?             @relation("ArticleDraftRevision", fields: [draftRevisionId], references: [id])
+  publishedRevision ArticleRevision?             @relation("ArticlePublishedRevision", fields: [publishedRevisionId], references: [id])
+  revisions         ArticleRevision[]            @relation("ArticleRevisions")
+  createdBy         User                         @relation("ArticleCreatedBy", fields: [createdById], references: [id])
+  archivedBy        User?                        @relation("ArticleArchivedBy", fields: [archivedById], references: [id])
+  publishedLocales  ArticlePublishedLocale[]
+  slugs             ArticleSlug[]
+  approvals         ArticleTranslationApproval[]
+
+  @@index([updatedAt])
+  @@index([firstPublishedAt])
+  @@map("articles")
+}
+
+/// Immutable snapshot of an article. Saving a draft inserts revision N+1, so published content is never overwritten.
+model ArticleRevision {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  articleId    String   @db.Uuid
+  number       Int // 1-based per article; also the optimistic-concurrency token
+  categoryCode String
+  coverMediaId String?  @db.Uuid
+  isFeatured   Boolean  @default(false)
+  authorName   String?
+  authorRole   String?
+  createdById  String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  article      Article                      @relation("ArticleRevisions", fields: [articleId], references: [id])
+  draftOf      Article?                     @relation("ArticleDraftRevision")
+  publishedOf  Article?                     @relation("ArticlePublishedRevision")
+  category     ArticleCategory              @relation(fields: [categoryCode], references: [code])
+  coverMedia   MediaAsset?                  @relation(fields: [coverMediaId], references: [id], onDelete: Restrict)
+  createdBy    User                         @relation(fields: [createdById], references: [id])
+  translations ArticleRevisionTranslation[]
+  mediaRefs    ArticleRevisionMedia[]
+
+  @@unique([articleId, number])
+  @@index([coverMediaId])
+  @@map("article_revisions")
+}
+
+model ArticleRevisionTranslation {
+  revisionId     String  @db.Uuid
+  locale         String
+  title          String
+  slug           String
+  excerpt        String?
+  content        Json? // Tiptap/ProseMirror document, validated against rich-content schema `contentVersion`
+  contentVersion Int     @default(1)
+  wordCount      Int     @default(0) // computed from content on save; drives read time without loading content
+  coverImageAlt  String? // alt text for the cover in this article + locale (usage-specific)
+  seoTitle       String?
+  seoDescription String?
+  contentHash    String // SHA-256 of the localized fields; approvals bind to it
+  sourceLocale   String? // locale this translation was produced from
+  sourceHash     String? // source contentHash at translation time; mismatch => translation outdated
+
+  revision  ArticleRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  localeRef Locale          @relation(fields: [locale], references: [code])
+
+  @@id([revisionId, locale])
+  @@index([locale, slug])
+  @@map("article_revision_translations")
+}
+
+/// Approval of one localized content version. Bound to contentHash, so any edit invalidates it.
+model ArticleTranslationApproval {
+  articleId    String   @db.Uuid
+  locale       String
+  contentHash  String
+  approvedById String   @db.Uuid
+  approvedAt   DateTime @default(now())
+
+  article    Article @relation(fields: [articleId], references: [id])
+  localeRef  Locale  @relation(fields: [locale], references: [code])
+  approvedBy User    @relation(fields: [approvedById], references: [id])
+
+  @@id([articleId, locale, contentHash])
+  @@map("article_translation_approvals")
+}
+
+/// Locales currently live. Their content always comes from Article.publishedRevisionId.
+model ArticlePublishedLocale {
+  articleId   String   @db.Uuid
+  locale      String
+  publishedAt DateTime @default(now()) // first time this locale went live
+
+  article   Article @relation(fields: [articleId], references: [id])
+  localeRef Locale  @relation(fields: [locale], references: [code])
+
+  @@id([articleId, locale])
+  @@map("article_published_locales")
+}
+
+/// Reserves (locale, slug) for one article — its draft and published slugs — so public URLs stay unique.
+model ArticleSlug {
+  locale    String
+  slug      String
+  articleId String @db.Uuid
+
+  article   Article @relation(fields: [articleId], references: [id])
+  localeRef Locale  @relation(fields: [locale], references: [code])
+
+  @@id([locale, slug])
+  @@index([articleId])
+  @@map("article_slugs")
+}
+
+/// Media referenced by a revision (cover + inline images). RESTRICT keeps referenced media from being deleted.
+model ArticleRevisionMedia {
+  revisionId String @db.Uuid
+  mediaId    String @db.Uuid
+
+  revision ArticleRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  media    MediaAsset      @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@id([revisionId, mediaId])
+  @@index([mediaId])
+  @@map("article_revision_media")
+}
+
+// ----------------------------------------------------
+// 4. Media
+// ----------------------------------------------------
+enum MediaCategory {
+  COMMODITY
+  FACILITY
+  LOGISTICS
+  CERTIFICATE
+  EVENT
+}
+
+model MediaAsset {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  storageKey       String         @unique // generated; never derived from the uploaded filename
+  originalFilename String // sanitized, display only
+  mimeType         String // detected from file bytes, never trusted from the client
+  byteSize         Int
+  width            Int
+  height           Int
+  checksumSha256   String
+  title            String
+  category         MediaCategory?
+  uploadedById     String         @db.Uuid
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  translations MediaAssetTranslation[]
+  coverOf      ArticleRevision[]
+  articleRefs  ArticleRevisionMedia[]
+  uploadedBy   User                    @relation(fields: [uploadedById], references: [id])
+
+  @@index([category, createdAt])
+  @@index([createdAt])
+  @@index([checksumSha256])
+  @@map("media_assets")
+}
+
+/// Default per-locale alt text. Usage-specific alt (article cover, inline image) is stored with the usage.
+model MediaAssetTranslation {
+  mediaId String @db.Uuid
+  locale  String
+  altText String
+
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  localeRef Locale     @relation(fields: [locale], references: [code])
+
+  @@id([mediaId, locale])
+  @@map("media_asset_translations")
+}
+
+// ----------------------------------------------------
+// 5. Not yet implemented domains (scaffold, no API yet).
+// ponytail: kept from the original scaffold untouched; they still use the SupportedLocale enum and
+// status-on-identity. Redesign each with the Article revision/locale pattern when its slice is built.
+// ----------------------------------------------------
+enum PublicationStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SupportedLocale {
+  en
+  vi
+}
+
+model Page {
+  id           String            @id @default(uuid())
+  systemKey    String            @unique // e.g., "home", "supply-chain", "about"
+  status       PublicationStatus @default(DRAFT)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  translations PageTranslation[]
+
+  @@map("pages")
+}
+
+model PageTranslation {
+  id             String          @id @default(uuid())
+  pageId         String
+  locale         SupportedLocale
+  title          String
+  slug           String
+  summary        String?
+  sections       Json? // Structured sections for Blue Ocean landing & narrative
+  seoTitle       String?
+  seoDescription String?
+  isStale        Boolean         @default(false)
+  page           Page            @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, locale])
+  @@unique([locale, slug])
+  @@map("page_translations")
+}
+
+enum CapabilityTier {
+  DIRECT_OPERATION // HMV trực tiếp thực hiện
+  STRATEGIC_PARTNER // HMV phối hợp cùng đối tác
+  IN_DEVELOPMENT // Năng lực đang phát triển
+}
+
+model Commodity {
+  id           String                 @id @default(uuid())
+  code         String                 @unique // e.g. "RICE-JASMINE", "COFFEE-ROBUSTA", "PEPPER-BLACK"
+  status       PublicationStatus      @default(DRAFT)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  translations CommodityTranslation[]
+  variants     ProductVariant[]
+
+  @@map("commodities")
+}
+
+model CommodityTranslation {
+  id             String          @id @default(uuid())
+  commodityId    String
+  locale         SupportedLocale
+  name           String
+  slug           String
+  originStory    String?         @db.Text
+  description    String?         @db.Text
+  seoTitle       String?
+  seoDescription String?
+  isStale        Boolean         @default(false)
+  commodity      Commodity       @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+
+  @@unique([commodityId, locale])
+  @@unique([locale, slug])
+  @@map("commodity_translations")
+}
+
+model ProductVariant {
+  id           String                      @id @default(uuid())
+  commodityId  String
+  skuCode      String                      @unique // e.g. "JAS-5P-EXP"
+  status       PublicationStatus           @default(DRAFT)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+  commodity    Commodity                   @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  translations ProductVariantTranslation[]
+  specs        ProductSpecification[]
+
+  @@map("product_variants")
+}
+
+model ProductVariantTranslation {
+  id        String          @id @default(uuid())
+  variantId String
+  locale    SupportedLocale
+  name      String
+  grade     String?
+  packaging String?
+  isStale   Boolean         @default(false)
+  variant   ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, locale])
+  @@map("product_variant_translations")
+}
+
+model ProductSpecification {
+  id        String         @id @default(uuid())
+  variantId String
+  specKey   String // e.g. "Moisture", "Broken Ratio", "Foreign Matter"
+  specValue String // e.g. "max 14%", "max 5%", "max 0.1%"
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("product_specifications")
+}
+
+model ProcessingCapability {
+  id           String                            @id @default(uuid())
+  code         String                            @unique // e.g. "OPTICAL-SORTING", "COLD-STORAGE"
+  tier         CapabilityTier                    @default(STRATEGIC_PARTNER)
+  status       PublicationStatus                 @default(DRAFT)
+  createdAt    DateTime                          @default(now())
+  updatedAt    DateTime                          @updatedAt
+  translations ProcessingCapabilityTranslation[]
+
+  @@map("processing_capabilities")
+}
+
+model ProcessingCapabilityTranslation {
+  id           String               @id @default(uuid())
+  capabilityId String
+  locale       SupportedLocale
+  title        String
+  description  String?              @db.Text
+  isStale      Boolean              @default(false)
+  capability   ProcessingCapability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([capabilityId, locale])
+  @@map("processing_capability_translations")
+}

@@ -1,0 +1,20 @@
+{
+  "name": "hmv-global-cms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HMV Global Content Management System - Integrated Agricultural Supply Chain & Global Trading",
+  "scripts": {
+    "dev": "pnpm --parallel --filter frontend --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "pnpm --filter backend start:dev",
+    "build": "pnpm --recursive run build",
+    "lint": "pnpm --recursive run lint",
+    "test": "pnpm --recursive run test",
+    "typecheck": "pnpm --recursive run typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

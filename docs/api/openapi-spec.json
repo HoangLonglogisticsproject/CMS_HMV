@@ -1,0 +1,3137 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "Auth_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sets the HttpOnly session cookie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "INVALID_CREDENTIALS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "Auth_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "Auth_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "Health_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Health status payload"
+          }
+        },
+        "summary": "Check API and Database Health",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/admin/media": {
+      "get": {
+        "operationId": "Media_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "-createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "-createdAt",
+                "title",
+                "-title",
+                "byteSize",
+                "-byteSize"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COMMODITY",
+                "FACILITY",
+                "LOGISTICS",
+                "CERTIFICATE",
+                "EVENT"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Matches title, file name or alt text (case-insensitive).",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Media"
+        ]
+      },
+      "post": {
+        "operationId": "Media_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG or WebP. Type is detected from the bytes."
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "COMMODITY",
+                      "FACILITY",
+                      "LOGISTICS",
+                      "CERTIFICATE",
+                      "EVENT"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "PAYLOAD_TOO_LARGE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "UNSUPPORTED_MEDIA_TYPE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Media"
+        ]
+      }
+    },
+    "/api/v1/admin/media/{id}": {
+      "get": {
+        "operationId": "Media_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Media"
+        ]
+      },
+      "patch": {
+        "operationId": "Media_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Media"
+        ]
+      }
+    },
+    "/api/v1/admin/media/{id}/usages": {
+      "get": {
+        "operationId": "Media_usages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaUsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MEDIA_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Media"
+        ]
+      }
+    },
+    "/api/v1/admin/articles": {
+      "get": {
+        "operationId": "AdminArticles_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "-updatedAt",
+              "type": "string",
+              "enum": [
+                "updatedAt",
+                "-updatedAt",
+                "createdAt",
+                "-createdAt",
+                "lastPublishedAt",
+                "-lastPublishedAt"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Omitted: every non-archived article.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "ARCHIVED"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match on draft title or slug in any locale.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "awaitingReview",
+            "required": false,
+            "in": "query",
+            "description": "true: only non-archived articles with at least one draft translation that is not approved.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      },
+      "post": {
+        "operationId": "AdminArticles_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateArticleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Creates the article with draft revision 1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "SLUG_TAKEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "RICH_CONTENT_INVALID | UNKNOWN_LOCALE | UNKNOWN_CATEGORY | MEDIA_NOT_FOUND | TRANSLATION_INCOMPLETE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/stats": {
+      "get": {
+        "operationId": "AdminArticles_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Counts across all pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleStatsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}": {
+      "get": {
+        "operationId": "AdminArticles_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current draft plus publication state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/draft": {
+      "patch": {
+        "operationId": "AdminArticles_updateDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateArticleDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saves a new draft revision. Published content is untouched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT | SLUG_TAKEN | ARTICLE_ARCHIVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "RICH_CONTENT_INVALID | UNKNOWN_LOCALE | UNKNOWN_CATEGORY | MEDIA_NOT_FOUND | TRANSLATION_INCOMPLETE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/preview": {
+      "get": {
+        "operationId": "AdminArticles_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The current draft rendered in the public response shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicArticle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/translations/{locale}/approve": {
+      "post": {
+        "operationId": "AdminArticles_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT | ARTICLE_ARCHIVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TRANSLATION_INCOMPLETE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/publish": {
+      "post": {
+        "operationId": "AdminArticles_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Publishes the draft revision; every approved locale goes live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRANSLATION_NOT_APPROVED | REVISION_CONFLICT | ARTICLE_ARCHIVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/archive": {
+      "post": {
+        "operationId": "AdminArticles_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ARTICLE_ARCHIVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/articles/{id}/restore": {
+      "post": {
+        "operationId": "AdminArticles_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ARTICLE_NOT_ARCHIVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/admin/article-categories": {
+      "get": {
+        "operationId": "AdminArticleCategories_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArticleCategoryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Articles"
+        ]
+      }
+    },
+    "/api/v1/public/articles": {
+      "get": {
+        "operationId": "PublicArticles_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+              "default": "vi",
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicArticleListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UNKNOWN_LOCALE | VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public · Articles"
+        ]
+      }
+    },
+    "/api/v1/public/articles/{slug}": {
+      "get": {
+        "operationId": "PublicArticles_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+              "default": "vi",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicArticle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UNKNOWN_LOCALE | VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ARTICLE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public · Articles"
+        ]
+      }
+    },
+    "/api/v1/public/article-categories": {
+      "get": {
+        "operationId": "PublicArticles_categories",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+              "default": "vi",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicCategory"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UNKNOWN_LOCALE | VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public · Articles"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "HMV Global CMS API",
+    "description": "Admin API (`/api/v1/admin/*`, `/api/v1/auth/*`) uses an HttpOnly session cookie set by `POST /auth/login` (`hmv_session`, or `__Host-hmv_session` in production) plus the `X-CSRF-Token` header on every write. Public API (`/api/v1/public/*`) is read-only and serves published content only. Errors always have the shape `ErrorResponse`; branch on `code`.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "hmv_session"
+      },
+      "csrf": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "csrfToken from the login/session response"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "Permission": {
+        "type": "string",
+        "enum": [
+          "article:read",
+          "article:write",
+          "article:review",
+          "article:publish",
+          "article:archive",
+          "media:read",
+          "media:write"
+        ]
+      },
+      "SessionUser": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "permissions",
+          "id",
+          "email",
+          "displayName",
+          "roles"
+        ]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/SessionUser"
+          },
+          "csrfToken": {
+            "type": "string",
+            "description": "Send back as the `X-CSRF-Token` header on every POST/PUT/PATCH/DELETE."
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user",
+          "csrfToken",
+          "expiresAt"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "BAD_REQUEST",
+          "VALIDATION_FAILED",
+          "UNAUTHENTICATED",
+          "INVALID_CREDENTIALS",
+          "PERMISSION_DENIED",
+          "CSRF_TOKEN_INVALID",
+          "ORIGIN_NOT_ALLOWED",
+          "RATE_LIMITED",
+          "NOT_FOUND",
+          "ARTICLE_NOT_FOUND",
+          "TRANSLATION_NOT_FOUND",
+          "MEDIA_NOT_FOUND",
+          "CONFLICT",
+          "REVISION_CONFLICT",
+          "SLUG_TAKEN",
+          "ARTICLE_ARCHIVED",
+          "ARTICLE_NOT_ARCHIVED",
+          "TRANSLATION_NOT_APPROVED",
+          "TRANSLATION_INCOMPLETE",
+          "RICH_CONTENT_INVALID",
+          "UNKNOWN_LOCALE",
+          "UNKNOWN_CATEGORY",
+          "REFERENCE_INVALID",
+          "FILE_REQUIRED",
+          "FILE_TOO_LARGE",
+          "UNSUPPORTED_MEDIA_TYPE",
+          "PAYLOAD_TOO_LARGE",
+          "INTERNAL_ERROR"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 409
+          },
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "description": "Code-specific detail, e.g. [{ path, message }] for validation errors"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ]
+      },
+      "MediaAltText": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "altText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "altText"
+        ]
+      },
+      "UserRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "displayName"
+        ]
+      },
+      "MediaAssetResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "Public URL of the stored object."
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "nullable": true,
+            "enum": [
+              "COMMODITY",
+              "FACILITY",
+              "LOGISTICS",
+              "CERTIFICATE",
+              "EVENT"
+            ],
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Detected from the file bytes."
+          },
+          "byteSize": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "originalFilename": {
+            "type": "string"
+          },
+          "checksumSha256": {
+            "type": "string"
+          },
+          "altTexts": {
+            "description": "Default alt text per locale. Usages (article cover, inline images) may override it.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAltText"
+            }
+          },
+          "uploadedBy": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "title",
+          "category",
+          "mimeType",
+          "byteSize",
+          "width",
+          "height",
+          "originalFilename",
+          "checksumSha256",
+          "altTexts",
+          "uploadedBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MediaListResponse": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAssetResponse"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "MediaAltTextInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "altText": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default alt text for this locale. `null` or \"\" removes it.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "locale",
+          "altText"
+        ]
+      },
+      "UpdateMediaDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` clears the category.",
+            "enum": [
+              "COMMODITY",
+              "FACILITY",
+              "LOGISTICS",
+              "CERTIFICATE",
+              "EVENT"
+            ]
+          },
+          "altTexts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAltTextInput"
+            }
+          }
+        }
+      },
+      "LocalizedTitle": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "title"
+        ]
+      },
+      "MediaUsage": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "revisionNumber": {
+            "type": "number"
+          },
+          "contexts": {
+            "type": "array",
+            "description": "Whether the referencing revision is the current draft, the published one, or both.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED"
+              ]
+            }
+          },
+          "titles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalizedTitle"
+            }
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId",
+          "revisionNumber",
+          "contexts",
+          "titles"
+        ]
+      },
+      "MediaUsageResponse": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string"
+          },
+          "inUse": {
+            "type": "boolean",
+            "description": "True when a current draft or published revision references the asset. Such assets must not be deleted."
+          },
+          "usages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaUsage"
+            }
+          },
+          "historicalRevisionCount": {
+            "type": "number",
+            "description": "Older revisions that still reference the asset (kept for history)."
+          }
+        },
+        "required": [
+          "mediaId",
+          "inUse",
+          "usages",
+          "historicalRevisionCount"
+        ]
+      },
+      "MediaRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "width",
+          "height"
+        ]
+      },
+      "ArticleTranslationSummary": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "description": "APPROVED when a reviewer approved exactly this content (any edit resets it).",
+            "enum": [
+              "UNREVIEWED",
+              "APPROVED"
+            ]
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "The locale is served by the public API."
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "The draft differs from what the public sees (always true when not live)."
+          },
+          "isOutdated": {
+            "type": "boolean",
+            "description": "The source locale changed after this translation was made."
+          },
+          "readTimeMinutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "locale",
+          "title",
+          "slug",
+          "reviewStatus",
+          "isLive",
+          "hasUnpublishedChanges",
+          "isOutdated",
+          "readTimeMinutes"
+        ]
+      },
+      "PublicationInfo": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "Revision number the public sees."
+          },
+          "firstPublishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastPublishedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "liveLocales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "firstPublishedAt",
+          "lastPublishedAt",
+          "liveLocales"
+        ]
+      },
+      "ArticleSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "Published, and the draft has moved past the published revision."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Current draft revision number. Send it back as `expectedRevision`."
+          },
+          "categoryCode": {
+            "type": "string"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverMedia": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaRef"
+              }
+            ]
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArticleTranslationSummary"
+            }
+          },
+          "publication": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicationInfo"
+              }
+            ]
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "description": "Author of the current draft revision.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "hasUnpublishedChanges",
+          "revision",
+          "categoryCode",
+          "isFeatured",
+          "authorName",
+          "coverMedia",
+          "translations",
+          "publication",
+          "archivedAt",
+          "createdAt",
+          "updatedAt",
+          "updatedBy"
+        ]
+      },
+      "ArticleListResponse": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArticleSummaryResponse"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "ArticleStatsResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Non-archived articles."
+          },
+          "draft": {
+            "type": "number",
+            "description": "Non-archived, never published."
+          },
+          "published": {
+            "type": "number",
+            "description": "Non-archived, published."
+          },
+          "archived": {
+            "type": "number"
+          },
+          "awaitingReview": {
+            "type": "number",
+            "description": "Non-archived with at least one draft translation that is not approved (same rule as `awaitingReview=true`)."
+          },
+          "featured": {
+            "type": "number",
+            "description": "Non-archived with the featured flag set on the current draft."
+          }
+        },
+        "required": [
+          "total",
+          "draft",
+          "published",
+          "archived",
+          "awaitingReview",
+          "featured"
+        ]
+      },
+      "TranslationInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+            "example": "vi"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Lowercase ASCII words joined by single hyphens. Unique per locale across all articles. Required when adding a locale.",
+            "maxLength": 200,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "example": "chuoi-cung-ung-ca-phe"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Tiptap/ProseMirror JSON, rich content schema v1. Nodes: doc, paragraph, text, heading(level 2|3), blockquote, bulletList, orderedList, listItem, codeBlock, hardBreak, horizontalRule, image(mediaId required; src is ignored on input and resolved on output). Marks: bold, italic, strike, underline, code, link(href http/https/mailto/tel or site-relative). Max 256 KiB."
+          },
+          "title": {
+            "type": "string",
+            "description": "Required when adding a locale.",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "excerpt": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "coverImageAlt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alt text for the cover image in this locale. Falls back to the asset's default alt.",
+            "maxLength": 500
+          },
+          "seoTitle": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "seoDescription": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "sourceLocale": {
+            "type": "string",
+            "nullable": true,
+            "description": "Declares this translation was produced from another locale of the same draft; the server records that locale's\ncurrent content hash so later source edits flag this translation as outdated. `null` clears it."
+          }
+        },
+        "required": [
+          "locale"
+        ]
+      },
+      "CreateArticleDto": {
+        "type": "object",
+        "properties": {
+          "categoryCode": {
+            "type": "string",
+            "description": "Stable category code from GET /admin/article-categories.",
+            "maxLength": 64
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "authorRole": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "translations": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationInput"
+            }
+          }
+        },
+        "required": [
+          "categoryCode",
+          "translations"
+        ]
+      },
+      "ArticleTranslationResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Tiptap/ProseMirror JSON, rich content schema v1. Nodes: doc, paragraph, text, heading(level 2|3), blockquote, bulletList, orderedList, listItem, codeBlock, hardBreak, horizontalRule, image(mediaId required; src is ignored on input and resolved on output). Marks: bold, italic, strike, underline, code, link(href http/https/mailto/tel or site-relative). Max 256 KiB."
+          },
+          "excerpt": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentVersion": {
+            "type": "number"
+          },
+          "coverImageAlt": {
+            "type": "string",
+            "nullable": true
+          },
+          "seoTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "seoDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 of the localized fields. Approvals bind to it."
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "nullable": true
+          },
+          "locale": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "APPROVED when a reviewer approved exactly this content (any edit resets it).",
+            "enum": [
+              "UNREVIEWED",
+              "APPROVED"
+            ],
+            "type": "string"
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "The locale is served by the public API."
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "The draft differs from what the public sees (always true when not live)."
+          },
+          "isOutdated": {
+            "type": "boolean",
+            "description": "The source locale changed after this translation was made."
+          },
+          "readTimeMinutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "content",
+          "excerpt",
+          "contentVersion",
+          "coverImageAlt",
+          "seoTitle",
+          "seoDescription",
+          "contentHash",
+          "wordCount",
+          "sourceLocale",
+          "locale",
+          "title",
+          "slug",
+          "reviewStatus",
+          "isLive",
+          "hasUnpublishedChanges",
+          "isOutdated",
+          "readTimeMinutes"
+        ]
+      },
+      "ArticleDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "Published, and the draft has moved past the published revision."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Current draft revision number. Send it back as `expectedRevision`."
+          },
+          "categoryCode": {
+            "type": "string"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverMedia": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaRef"
+              }
+            ]
+          },
+          "publication": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicationInfo"
+              }
+            ]
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "description": "Author of the current draft revision.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
+          "authorRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArticleTranslationResponse"
+            }
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserRef"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "hasUnpublishedChanges",
+          "revision",
+          "categoryCode",
+          "isFeatured",
+          "authorName",
+          "coverMedia",
+          "publication",
+          "archivedAt",
+          "createdAt",
+          "updatedAt",
+          "updatedBy",
+          "authorRole",
+          "translations",
+          "createdBy"
+        ]
+      },
+      "UpdateArticleDraftDto": {
+        "type": "object",
+        "properties": {
+          "categoryCode": {
+            "type": "string",
+            "description": "Stable category code from GET /admin/article-categories.",
+            "maxLength": 64
+          },
+          "coverMediaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "authorRole": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "translations": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationInput"
+            }
+          },
+          "expectedRevision": {
+            "type": "number",
+            "description": "The `revision` the client last loaded. A mismatch returns 409 REVISION_CONFLICT instead of overwriting.",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ]
+      },
+      "PublicSeo": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title",
+          "description"
+        ]
+      },
+      "PublicAlternate": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "slug"
+        ]
+      },
+      "PublicCategory": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "PublicCover": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "alt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "url",
+          "width",
+          "height",
+          "alt"
+        ]
+      },
+      "PublicArticle": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Rich content v1 with image src/alt resolved"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/PublicSeo"
+          },
+          "alternates": {
+            "description": "The same article in other live locales (for hreflang).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicAlternate"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "$ref": "#/components/schemas/PublicCategory"
+          },
+          "cover": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicCover"
+              }
+            ]
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "readTimeMinutes": {
+            "type": "number"
+          },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "First publication. Null only in draft previews."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "content",
+          "seo",
+          "alternates",
+          "id",
+          "locale",
+          "slug",
+          "title",
+          "excerpt",
+          "category",
+          "cover",
+          "isFeatured",
+          "authorName",
+          "authorRole",
+          "readTimeMinutes",
+          "publishedAt",
+          "updatedAt"
+        ]
+      },
+      "RevisionRefDto": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ]
+      },
+      "LocalizedName": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "name"
+        ]
+      },
+      "ArticleCategoryResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalizedName"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "sortOrder",
+          "names"
+        ]
+      },
+      "PublicArticleSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "$ref": "#/components/schemas/PublicCategory"
+          },
+          "cover": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicCover"
+              }
+            ]
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "readTimeMinutes": {
+            "type": "number"
+          },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "First publication. Null only in draft previews."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "locale",
+          "slug",
+          "title",
+          "excerpt",
+          "category",
+          "cover",
+          "isFeatured",
+          "authorName",
+          "authorRole",
+          "readTimeMinutes",
+          "publishedAt",
+          "updatedAt"
+        ]
+      },
+      "PublicArticleListResponse": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicArticleSummary"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      }
+    }
+  }
+}

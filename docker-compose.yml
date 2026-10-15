@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hmv-cms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hmv_user
+      POSTGRES_PASSWORD: REMOVED_DEV_PASSWORD
+      POSTGRES_DB: hmv_cms
+    ports:
+      # ponytail: 5442 avoids clashing with other local Postgres instances on 5432
+      - '5442:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hmv_user -d hmv_cms']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
