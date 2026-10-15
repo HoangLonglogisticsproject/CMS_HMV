@@ -1,3 +1,8 @@
 packages:
   - 'frontend'
   - 'backend'
+
+# Moved from the former nested frontend/pnpm-workspace.yaml: pnpm reads these only from the workspace root.
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
