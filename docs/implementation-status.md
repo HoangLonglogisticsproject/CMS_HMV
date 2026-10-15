@@ -37,7 +37,8 @@ Mocks for articles and media were removed.
 2. **Login rate limiting** is in-memory (single API instance); move to Redis/Postgres before scaling out.
 3. **Deployment**: CMS and API must be same-site with HTTPS (cookie `__Host-`, `SameSite=Lax`); `TRUST_PROXY` must
    match the proxy chain; no infrastructure/security acceptance done.
-4. No user-management API/UI (users are provisioned with `pnpm --filter backend user:create`).
+4. User management is functional (API + minimal UI at `/admin/users`); presentation to be refined. No MFA or email
+   recovery (see `docs/operations/auth-runbook.md`).
 5. Uploaded images are not re-encoded; EXIF is not stripped.
 6. Publishing rule: one published revision per article — an unapproved edit to a live locale blocks publishing other
    locales (options in `docs/api/admin-integration-contract.md` §7; needs a business decision).

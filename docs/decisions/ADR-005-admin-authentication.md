@@ -26,6 +26,8 @@ JavaScript, sessions must be revocable, and authorization must not be a hard-cod
 
 ## Consequences
 - Frontend must send `credentials: 'include'` and the CSRF header; CMS and API must be same-site or proxied.
-- No user-management API yet: users are provisioned with `pnpm --filter backend user:create`.
+- User management: `/api/v1/admin/users*` (permission `user:manage`, ADMIN only; never leaves zero active admins) and
+  self-service `POST /auth/password`. CLIs: `user:create` (create only, refuses existing emails), `user:reset-password`
+  (explicit, confirmed), `user:list`. See `docs/operations/auth-runbook.md`.
 - Rate-limit counters must move to Redis/Postgres before running more than one API instance.
-- No MFA, password reset or account lockout notifications yet.
+- No MFA, email-based self-service recovery or lockout notifications yet (recovery is admin- or CLI-initiated).
