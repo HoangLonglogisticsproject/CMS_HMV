@@ -6,7 +6,12 @@ import { AppError } from '../../common/errors';
 import { APP_CONFIG, type AppConfig } from '../../config';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import type { AuthContext } from './auth.decorators';
-import { DUMMY_HASH, verifyPassword } from './password';
+import {
+  DUMMY_HASH,
+  hashPassword,
+  passwordProblem,
+  verifyPassword,
+} from './password';
 
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
@@ -92,6 +97,8 @@ export class AuthService {
   // one account without letting a single attacker lock that account out for everyone.
   private readonly ipLimiter = new FixedWindowLimiter(20, 15 * 60_000);
   private readonly accountLimiter = new FixedWindowLimiter(5, 15 * 60_000);
+  // Wrong current passwords per user: a hijacked session cannot brute-force the password it needs to take over.
+  private readonly passwordLimiter = new FixedWindowLimiter(5, 15 * 60_000);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -224,6 +231,83 @@ export class AuthService {
       );
     }
     return this.toContext(session, req.ip);
+  }
+
+  /**
+   * Self-service change: requires the current password; keeps this session and revokes every other session of the
+   * user (a stolen session elsewhere stops working). Returns the number of revoked sessions.
+   */
+  async changePassword(
+    auth: AuthContext,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<number> {
+    const problem =
+      passwordProblem(newPassword) ??
+      (newPassword === currentPassword
+        ? 'New password must differ from the current one'
+        : null);
+    if (problem)
+      throw new AppError(
+        400,
+        'VALIDATION_FAILED',
+        'Request validation failed',
+        [{ path: 'newPassword', message: problem }],
+      );
+
+    const key = `pwd:${auth.userId}`;
+    const retryAfterSeconds = this.passwordLimiter.consume(key);
+    if (retryAfterSeconds)
+      throw new AppError(
+        429,
+        'RATE_LIMITED',
+        'Too many attempts, try again later',
+        { retryAfterSeconds },
+      );
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: auth.userId },
+      select: { passwordHash: true },
+    });
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      await audit(
+        this.prisma,
+        { userId: auth.userId, ip: auth.ip },
+        'auth.password_change_failed',
+        'user',
+        auth.userId,
+      );
+      throw new AppError(
+        403,
+        'CURRENT_PASSWORD_INCORRECT',
+        'Current password is incorrect',
+      );
+    }
+    this.passwordLimiter.reset(key);
+
+    const passwordHash = await hashPassword(newPassword);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: auth.userId },
+        data: { passwordHash },
+      });
+      const { count } = await tx.session.updateMany({
+        where: {
+          userId: auth.userId,
+          revokedAt: null,
+          id: { not: auth.sessionId },
+        },
+        data: { revokedAt: new Date() },
+      });
+      await audit(
+        tx,
+        { userId: auth.userId, ip: auth.ip },
+        'auth.password_change',
+        'user',
+        auth.userId,
+        { sessionsRevoked: count },
+      );
+      return count;
+    });
   }
 
   async logout(auth: AuthContext) {

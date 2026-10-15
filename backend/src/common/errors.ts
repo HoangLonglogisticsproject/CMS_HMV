@@ -40,6 +40,11 @@ export const ERROR_CODES = [
   'UNSUPPORTED_MEDIA_TYPE',
   'PAYLOAD_TOO_LARGE',
   'INTERNAL_ERROR',
+  'CURRENT_PASSWORD_INCORRECT',
+  'USER_NOT_FOUND',
+  'EMAIL_TAKEN',
+  'UNKNOWN_ROLE',
+  'LAST_ADMIN',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

@@ -8,7 +8,9 @@ import {
   Res,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
@@ -23,7 +25,7 @@ import {
   type Permission,
   Public,
 } from './auth.decorators';
-import { LoginDto, SessionResponse } from './auth.dto';
+import { ChangePasswordDto, LoginDto, SessionResponse } from './auth.dto';
 import { AuthService } from './auth.service';
 
 const toSession = (auth: AuthContext): SessionResponse => ({
@@ -86,6 +88,37 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logout(auth);
     res.clearCookie(this.auth.cookieName, this.auth.cookieOptions);
+  }
+
+  @Post('password')
+  @HttpCode(204)
+  @ApiCookieAuth('session')
+  @ApiNoContentResponse({
+    description:
+      'Password changed; this session stays signed in, every other session of the user is revoked',
+  })
+  @ApiBadRequestResponse({
+    type: ErrorResponse,
+    description: 'VALIDATION_FAILED (policy, or same as the current one)',
+  })
+  @ApiUnauthorizedResponse({
+    type: ErrorResponse,
+    description: 'UNAUTHENTICATED',
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponse,
+    description:
+      'CURRENT_PASSWORD_INCORRECT | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED',
+  })
+  @ApiTooManyRequestsResponse({
+    type: ErrorResponse,
+    description: 'RATE_LIMITED (see Retry-After)',
+  })
+  async changePassword(
+    @CurrentUser() auth: AuthContext,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<void> {
+    await this.auth.changePassword(auth, dto.currentPassword, dto.newPassword);
   }
 
   @Get('session')
