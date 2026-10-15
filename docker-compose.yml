@@ -8,8 +8,12 @@ services:
       POSTGRES_PASSWORD: REMOVED_DEV_PASSWORD
       POSTGRES_DB: hmv_cms
     ports:
-      # ponytail: 5442 avoids clashing with other local Postgres instances on 5432
-      - '5442:5432'
+      # ponytail: 5442 avoids clashing with other local Postgres instances on 5432.
+      # Loopback only: the dev credentials are well-known defaults, so the port must not be reachable from the LAN.
+      # Both families: DATABASE_URL uses `localhost`, which resolves to ::1 first; without the IPv6 binding every
+      # new Prisma connection waits ~2 s before falling back to 127.0.0.1.
+      - '127.0.0.1:5442:5432'
+      - '[::1]:5442:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
