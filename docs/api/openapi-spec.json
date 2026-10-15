@@ -72,6 +72,76 @@
         ]
       }
     },
+    "/api/v1/auth/password": {
+      "post": {
+        "operationId": "Auth_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; this session stays signed in, every other session of the user is revoked"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED (policy, or same as the current one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CURRENT_PASSWORD_INCORRECT | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/session": {
       "get": {
         "operationId": "Auth_session",
@@ -1795,6 +1865,512 @@
           "Public · Articles"
         ]
       }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "operationId": "Users_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      },
+      "post": {
+        "operationId": "Users_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "EMAIL_TAKEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/v1/admin/roles": {
+      "get": {
+        "operationId": "Users_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{id}": {
+      "patch": {
+        "operationId": "Users_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "LAST_ADMIN: the change would leave no active user with user:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{id}/password": {
+      "post": {
+        "operationId": "Users_setPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "New password set; every session of that user is revoked"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{id}/sessions/revoke": {
+      "post": {
+        "operationId": "Users_revokeSessions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/v1/admin/security-events": {
+      "get": {
+        "operationId": "Users_securityEvents",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Users"
+        ]
+      }
     }
   },
   "info": {
@@ -1848,7 +2424,8 @@
           "article:publish",
           "article:archive",
           "media:read",
-          "media:write"
+          "media:write",
+          "user:manage"
         ]
       },
       "SessionUser": {
@@ -1935,7 +2512,12 @@
           "FILE_TOO_LARGE",
           "UNSUPPORTED_MEDIA_TYPE",
           "PAYLOAD_TOO_LARGE",
-          "INTERNAL_ERROR"
+          "INTERNAL_ERROR",
+          "CURRENT_PASSWORD_INCORRECT",
+          "USER_NOT_FOUND",
+          "EMAIL_TAKEN",
+          "UNKNOWN_ROLE",
+          "LAST_ADMIN"
         ]
       },
       "ErrorResponse": {
@@ -1964,6 +2546,26 @@
           "statusCode",
           "code",
           "message"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "12..1024 characters, no leading/trailing whitespace, different from the current one.",
+            "minLength": 12,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
         ]
       },
       "MediaAltText": {
@@ -3129,6 +3731,246 @@
           "page",
           "pageSize",
           "total",
+          "items"
+        ]
+      },
+      "AdminUserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastLoginAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "activeSessions": {
+            "type": "number",
+            "description": "Sessions that are neither revoked nor expired."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "isActive",
+          "roles",
+          "lastLoginAt",
+          "createdAt",
+          "activeSessions"
+        ]
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserResponse"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "RoleResponse": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "permissions",
+          "code",
+          "name",
+          "description"
+        ]
+      },
+      "RoleListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleResponse"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "roles": {
+            "description": "Role codes from GET /admin/roles.",
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password set by the administrator and handed over out of band; the user changes it after signing in.",
+            "minLength": 12,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "roles",
+          "password"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "roles": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false signs the user out everywhere and blocks sign-in; true restores access."
+          }
+        }
+      },
+      "AdminSetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      },
+      "RevokeSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "revoked"
+        ]
+      },
+      "SecurityEventResponse": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actorEmail": {
+            "type": "string",
+            "nullable": true,
+            "description": "Who did it; null for the CLI and for failed sign-ins of unknown accounts."
+          },
+          "targetEmail": {
+            "type": "string",
+            "nullable": true,
+            "description": "The account it concerns, when it is a user."
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "metadata",
+          "id",
+          "action",
+          "createdAt",
+          "actorEmail",
+          "targetEmail",
+          "ipAddress"
+        ]
+      },
+      "SecurityEventListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityEventResponse"
+            }
+          }
+        },
+        "required": [
           "items"
         ]
       }
