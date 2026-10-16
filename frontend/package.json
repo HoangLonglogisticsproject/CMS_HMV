@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "api:generate": "openapi-typescript ../docs/api/openapi-spec.json -o src/lib/api/schema.d.ts",
+    "test:unit": "playwright test --config playwright.unit.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
