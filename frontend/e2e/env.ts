@@ -1,7 +1,27 @@
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { parseEnv } from "node:util";
 
 export const backendDir = resolve(__dirname, "../../backend");
+
+/**
+ * E2E_DATABASE_URL, or else the server and credentials of DATABASE_URL in backend/.env with the database
+ * hmv_cms_e2e_test: no password is ever written in this repository. Read on use, so pure unit tests need no database.
+ */
+function e2eDatabaseUrl() {
+  if (process.env.E2E_DATABASE_URL) return process.env.E2E_DATABASE_URL;
+  const file = join(backendDir, ".env");
+  const dev = existsSync(file) ? parseEnv(readFileSync(file, "utf8")).DATABASE_URL : undefined;
+  if (!dev) {
+    throw new Error(
+      "Set E2E_DATABASE_URL, or DATABASE_URL in backend/.env (its server is reused with the database hmv_cms_e2e_test).",
+    );
+  }
+  const url = new URL(dev);
+  url.pathname = "/hmv_cms_e2e_test";
+  return url.toString();
+}
 
 const apiPort = 4100;
 const webPort = 3100;
@@ -11,8 +31,9 @@ export const E2E = {
   webPort,
   api: `http://localhost:${apiPort}`,
   web: `http://localhost:${webPort}`,
-  databaseUrl:
-    process.env.E2E_DATABASE_URL ?? "postgresql://hmv_user:REMOVED_DEV_PASSWORD@localhost:5442/hmv_cms_e2e_test?schema=public",
+  get databaseUrl() {
+    return e2eDatabaseUrl();
+  },
   mediaDir: join(tmpdir(), "hmv-cms-e2e-media"),
   password: "e2e-only-password-0001",
   users: {

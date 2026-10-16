@@ -10,8 +10,9 @@ supply-chain stages, dashboard, user management.
 ## Run locally
 
 ```bash
+cp .env.example .env                    # repo root: choose POSTGRES_PASSWORD (gitignored)
 docker compose up -d postgres          # from the repo root; Postgres on localhost:5442
-cp backend/.env.example backend/.env    # then adjust
+cp backend/.env.example backend/.env    # then put the same password in DATABASE_URL
 pnpm install
 pnpm --filter backend db:migrate        # prisma migrate deploy
 pnpm --filter backend build
@@ -61,8 +62,9 @@ See [`.env.example`](./.env.example). Production needs at least `NODE_ENV=produc
 
 ## Tests
 
-Integration tests need the Postgres container. They run against `hmv_cms_test` (override with
-`TEST_DATABASE_URL`; the name must end in `_test`) and truncate its data. Responses are checked against the
+Integration tests need the Postgres container. They run against `hmv_cms_test` on the server and credentials of
+`DATABASE_URL` in `backend/.env` (override with `TEST_DATABASE_URL`; the name must end in `_test`) and truncate its
+data. No database password is committed anywhere (checked by `credential-safety.spec.ts`). Responses are checked against the
 generated OpenAPI schemas, so undocumented or missing fields fail the build.
 
 Design decisions: [ADR-004](../docs/decisions/ADR-004-content-revisions-and-localization.md) (revisions,

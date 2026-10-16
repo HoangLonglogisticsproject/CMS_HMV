@@ -7,6 +7,7 @@ mọi lệnh dưới đây tự hỏi mật khẩu ở dạng ẩn.
 
 ```bash
 docker compose up -d postgres            # Postgres :5442, chỉ nghe trên loopback, dữ liệu nằm trong volume
+                                         # (mật khẩu DB đọc từ .env ở thư mục gốc, xem README.md)
 pnpm install                             # an toàn: chỉ chạy `prisma generate`, không đụng dữ liệu
 pnpm --filter backend db:migrate         # áp migration mới (vd. quyền user:manage cho ADMIN)
 pnpm --filter backend start:dev          # API :4000

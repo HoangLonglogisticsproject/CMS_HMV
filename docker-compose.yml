@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: hmv_user
-      POSTGRES_PASSWORD: REMOVED_DEV_PASSWORD
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env at the repository root (see .env.example)}
       POSTGRES_DB: hmv_cms
     ports:
       # ponytail: 5442 avoids clashing with other local Postgres instances on 5432.

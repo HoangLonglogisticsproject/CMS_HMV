@@ -1,5 +1,6 @@
 // Guards against the causes of the 2026-10 admin lockouts coming back: hidden credential writers, provisioning wired
 // into install/build/start, automation using real accounts, and passwords committed in scripts or docs.
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
@@ -80,6 +81,24 @@ describe('credential safety', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('no database password is committed: compose and test configs read it from the environment', () => {
+    const tracked = execFileSync('git', ['ls-files'], {
+      cwd: repo,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter((f) => /\.(ts|tsx|js|mjs|cjs|json|md|ya?ml|example)$/.test(f));
+    // user:password@ in a PostgreSQL URL, unless the password is the CHANGE_ME placeholder or a ${VAR} reference.
+    const inline = /postgres(?:ql)?:\/\/[^:\s/@]+:(?!CHANGE_ME@|\$\{)[^@\s]+@/;
+    const offenders = tracked.filter((f) =>
+      inline.test(readFileSync(join(repo, f), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
+    expect(readFileSync(join(repo, 'docker-compose.yml'), 'utf8')).toMatch(
+      /POSTGRES_PASSWORD:\s*\$\{POSTGRES_PASSWORD:\?/,
+    );
+  });
+
   it('the destructive test reset refuses any database not named *_test', async () => {
     const prisma = {
       $executeRawUnsafe: () => {
@@ -89,7 +108,7 @@ describe('credential safety', () => {
     const saved = process.env.DATABASE_URL;
     try {
       for (const db of ['hmv_cms', 'hmv_cms_test_backup', 'production']) {
-        process.env.DATABASE_URL = `postgresql://u:p@localhost:5442/${db}`;
+        process.env.DATABASE_URL = `postgresql://u:CHANGE_ME@localhost:5442/${db}`;
         await expect(resetTestData(prisma)).rejects.toThrow('Refusing to wipe');
       }
     } finally {

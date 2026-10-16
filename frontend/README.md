@@ -7,7 +7,7 @@ Integration contract: [`../docs/api/admin-integration-contract.md`](../docs/api/
 ## Run against the real API
 
 ```bash
-docker compose up -d postgres                  # repo root (Postgres on :5442)
+docker compose up -d postgres                  # repo root (Postgres on :5442; needs .env, see ../README.md)
 pnpm --filter backend db:migrate && pnpm --filter backend build
 pnpm --filter backend user:create --email you@hmv.vn --name "Tên" --role ADMIN   # prompts for the password
 pnpm --filter backend start:dev                # API on :4000
@@ -30,7 +30,8 @@ The API's `CORS_ORIGIN` must contain the CMS origin. `NEXT_PUBLIC_API_URL` is in
 
 `pnpm --filter frontend test:e2e` starts the built API on :4100 with its own database `hmv_cms_e2e_test` (wiped and
 re-provisioned with one user per role) and a production build of this app on :3100 (built into `.next-e2e`, so a
-running `next dev` is not disturbed). Requires the Postgres container and `pnpm --filter backend build`.
+running `next dev` is not disturbed). Requires the Postgres container and `pnpm --filter backend build`. The database
+URL reuses the server and credentials of `DATABASE_URL` in `backend/.env` (override with `E2E_DATABASE_URL`).
 First run on a machine: `npx playwright install chromium`.
 
 ## Where things live

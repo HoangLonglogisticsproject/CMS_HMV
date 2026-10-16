@@ -22,6 +22,7 @@ redirect dropping drafts) — each was caught by the relevant test.
 ### How to run
 
 ```bash
+cp .env.example .env    # once: POSTGRES_PASSWORD; backend/.env DATABASE_URL uses the same password (see README.md)
 docker compose up -d postgres
 pnpm --filter backend test && pnpm --filter backend test:e2e     # unit + PostgreSQL integration (hmv_cms_test)
 pnpm --filter backend build && pnpm --filter frontend test:e2e   # browser E2E (hmv_cms_e2e_test, ports 4100/3100)
@@ -46,8 +47,9 @@ Mocks for articles and media were removed.
    locales (options in `docs/api/admin-integration-contract.md` §7; needs a business decision).
 7. Admin search is accent-sensitive ("chuoi" ≠ "chuỗi").
 8. **Production Security milestone (separate, not started)**: HTTPS pilot and deployment review (item 3), shared
-   rate-limit store (item 2), first-login password change, the development PostgreSQL password still in tracked files
-   (`docker-compose.yml`, test fallbacks; remove, then rotate), production secrets management.
+   rate-limit store (item 2), first-login password change, production secrets management. Production deployment is
+   not approved. (The development PostgreSQL password was removed from source and history and rotated before the
+   first push; compose and tests read it from the environment.)
 
 ## History
 
