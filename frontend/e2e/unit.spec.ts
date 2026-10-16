@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { isSafeHref } from "@/components/editor/content-rules";
 import { initials } from "@/components/layout/header";
-import { ApiError, apiOrigin } from "@/lib/api/client";
+import { adoptSessionCsrfToken, ApiError, apiOrigin, call, getCsrfToken, onStaleSession, setCsrfToken } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import type { ArticleDetail } from "@/modules/content/articles/queries/use-articles";
 import {
@@ -195,5 +195,33 @@ test.describe("getArticlePublishReadiness (mirrors ArticlesService.publish)", ()
     expect(getArticlePublishReadiness({ ...ready, status: "ARCHIVED" }, publisher).blocker).toBe("ARCHIVED");
     expect(getArticlePublishReadiness(ready, { canPublish: true, hasUnsavedEdits: true }).blocker).toBe("UNSAVED_EDITS");
     expect(getArticlePublishReadiness(ready, publisher)).toMatchObject({ canPublish: true, reason: null });
+  });
+});
+
+test.describe("CSRF token ownership (cross-tab identity)", () => {
+  test("a background session read never arms the tab with another account's token", () => {
+    setCsrfToken("token-a", "user-a"); // signed in as A in this tab
+    expect(adoptSessionCsrfToken("token-b", "user-b")).toBe(false); // B signed in from another tab
+    expect(getCsrfToken()).toBe("token-a"); // writes from A's screen keep failing the server's CSRF check
+    expect(adoptSessionCsrfToken("token-a2", "user-a")).toBe(true); // same account, new session
+    expect(getCsrfToken()).toBe("token-a2");
+    setCsrfToken(null); // expired: A's screen is still mounted (hidden), so B is still not adopted
+    expect(adoptSessionCsrfToken("token-b", "user-b")).toBe(false);
+    expect(getCsrfToken()).toBe(null);
+    setCsrfToken(null, null); // signed out: nothing on screen, a fresh read may adopt any account
+    expect(adoptSessionCsrfToken("token-b", "user-b")).toBe(true);
+    setCsrfToken("token-c", "user-c"); // an explicit sign-in in this tab replaces the owner
+    expect(adoptSessionCsrfToken("token-b", "user-b")).toBe(false);
+    setCsrfToken(null, null);
+  });
+
+  test("403 CSRF_TOKEN_INVALID and PERMISSION_DENIED tell the app its session is out of date", async () => {
+    let signals = 0;
+    const off = onStaleSession(() => signals++);
+    const answer = (code: string) =>
+      call(Promise.resolve({ error: { code, message: code }, response: new Response(null, { status: 403 }) }));
+    for (const code of ["CSRF_TOKEN_INVALID", "PERMISSION_DENIED", "ORIGIN_NOT_ALLOWED"]) await answer(code).catch(() => undefined);
+    off();
+    expect(signals).toBe(2); // not for ORIGIN_NOT_ALLOWED: re-reading the session cannot fix that
   });
 });

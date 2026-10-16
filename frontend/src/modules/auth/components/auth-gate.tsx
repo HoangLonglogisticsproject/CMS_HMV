@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { onPermissionDenied, onSessionExpired, setCsrfToken } from "@/lib/api/client";
+import { onSessionExpired, onStaleSession, setCsrfToken } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import { authState, useSession } from "../queries/use-session";
@@ -48,11 +48,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setCsrfToken(null);
       queryClient.setQueryData(queryKeys.auth.session, null);
     });
-    // A 403 means the permissions on screen are stale: reload them (the server already refused the request).
-    const offDenied = onPermissionDenied(() => void queryClient.invalidateQueries({ queryKey: queryKeys.auth.session }));
+    // The server refused a request because the session on screen is stale (permissions changed, or another tab replaced
+    // the session cookie): re-read it. Changed permissions update in place; another account triggers the reload above.
+    const offStale = onStaleSession(() => void queryClient.invalidateQueries({ queryKey: queryKeys.auth.session }));
     return () => {
       offExpired();
-      offDenied();
+      offStale();
     };
   }, [queryClient]);
 

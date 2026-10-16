@@ -40,9 +40,21 @@ export const isApiError = (err: unknown, code?: ApiErrorCode): err is ApiError =
 // ---------- CSRF token (in memory only; re-read from GET /auth/session after a reload) ----------
 
 let csrfToken: string | null = null;
-export const setCsrfToken = (token: string | null) => {
+// The account whose screen this tab shows. The session cookie is shared by every tab of the browser: after another tab
+// signs in as B, this tab's next session read returns B while A's screen (and unsaved draft) is still mounted. B's
+// token must never arm writes sent from A's screen, or the server runs them as B; AuthGate reloads the tab instead.
+let csrfOwner: string | null = null;
+/** Sign-in (`userId`) or sign-out (`null, null`) in this tab. Without `userId` (expiry) the owner is kept. */
+export const setCsrfToken = (token: string | null, userId?: string | null) => {
   csrfToken = token;
+  if (userId !== undefined) csrfOwner = userId;
 };
+/** From a session read: adopted only for the account this tab shows, or when it shows none yet. */
+export function adoptSessionCsrfToken(token: string, userId: string) {
+  if (csrfOwner !== null && csrfOwner !== userId) return false;
+  setCsrfToken(token, userId);
+  return true;
+}
 export const getCsrfToken = () => csrfToken;
 
 // ---------- Session expiry signal ----------
@@ -54,13 +66,17 @@ export function onSessionExpired(listener: () => void) {
   return () => void expiredListeners.delete(listener);
 }
 
-// ---------- Permission change signal ----------
+// ---------- Stale session signal ----------
 
-const deniedListeners = new Set<() => void>();
-/** Fires when a request answers 403 PERMISSION_DENIED: the permissions on screen are older than the server's. */
-export function onPermissionDenied(listener: () => void) {
-  deniedListeners.add(listener);
-  return () => void deniedListeners.delete(listener);
+const staleListeners = new Set<() => void>();
+const STALE_CODES = new Set<ApiErrorCode>(["PERMISSION_DENIED", "CSRF_TOKEN_INVALID"]);
+/**
+ * Fires when a 403 means the session on screen is older than the server's: PERMISSION_DENIED (roles changed) or
+ * CSRF_TOKEN_INVALID (the session cookie was replaced, e.g. another tab signed in).
+ */
+export function onStaleSession(listener: () => void) {
+  staleListeners.add(listener);
+  return () => void staleListeners.delete(listener);
 }
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -88,7 +104,7 @@ function toApiError(status: number, body: unknown): ApiError {
     e && typeof e.code === "string"
       ? new ApiError(status, e.code, e.message ?? e.code, e.details)
       : new ApiError(status, status === 401 ? "UNAUTHENTICATED" : "INTERNAL_ERROR", `HTTP ${status}`);
-  if (err.code === "PERMISSION_DENIED") deniedListeners.forEach((listener) => listener());
+  if (STALE_CODES.has(err.code)) staleListeners.forEach((listener) => listener());
   return err;
 }
 

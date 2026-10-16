@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, call, isApiError, setCsrfToken, type Schemas } from "@/lib/api/client";
+import { adoptSessionCsrfToken, api, call, isApiError, setCsrfToken, type Schemas } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 
 export type Session = Schemas["SessionResponse"];
@@ -15,7 +15,8 @@ export function useSession() {
     queryFn: async ({ signal }): Promise<Session | null> => {
       try {
         const session = await call(api.GET("/api/v1/auth/session", { signal }));
-        setCsrfToken(session.csrfToken);
+        // Another account (signed in from another tab) is not adopted: AuthGate sees the change and reloads the tab.
+        adoptSessionCsrfToken(session.csrfToken, session.user.id);
         return session;
       } catch (err) {
         if (isApiError(err, "UNAUTHENTICATED")) {
@@ -52,7 +53,7 @@ export function useLogin(keepCacheForUserId?: string) {
         queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== queryKeys.auth.session[0] });
         queryClient.getMutationCache().clear();
       }
-      setCsrfToken(session.csrfToken);
+      setCsrfToken(session.csrfToken, session.user.id);
       queryClient.setQueryData(queryKeys.auth.session, session);
     },
   });
@@ -67,7 +68,7 @@ export function useLogout() {
     mutationFn: () => call(api.POST("/api/v1/auth/logout")),
     // Clear locally even if the request fails (e.g. session already expired).
     onSettled: () => {
-      setCsrfToken(null);
+      setCsrfToken(null, null);
       queryClient.clear();
       queryClient.setQueryData(queryKeys.auth.session, null);
     },
