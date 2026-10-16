@@ -52,3 +52,16 @@ pnpm --filter frontend test:e2e                # browser E2E on :4100/:3100, dat
 Test databases end in `_test`, are created and migrated automatically, and reuse the server and credentials of
 `DATABASE_URL` in `backend/.env` (override with `TEST_DATABASE_URL` / `E2E_DATABASE_URL`). Tests never touch the
 development database `hmv_cms` and use their own `*@e2e.test` accounts.
+
+## Development workflow
+
+- `main` changes only through pull requests: nobody, people or agents, commits or pushes to it directly.
+- One branch per milestone or fix, from the latest `main`: `feat/…`, `fix/…`, `chore/…`, `docs/…`.
+- Every pull request into `main` runs CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), which must be green:
+  - `quality`: frozen install, typecheck, lint, backend and frontend unit tests, backend and frontend builds;
+  - `integration`: backend integration tests on a throwaway PostgreSQL 16; migrations must match `schema.prisma`;
+  - `e2e`: the full Playwright suite on a throwaway PostgreSQL 16.
+- The Product Owner reviews and merges with **squash merge**. Feature branches are deleted by the owner after merge.
+- CI has read-only access to the repository, uses no secrets and deploys nothing. No deployment pipeline exists.
+- Branch protection is a convention for now: rulesets are not available for private repositories on GitHub Free.
+  The ruleset to enable after an upgrade is described in the CI Foundation pull request.
