@@ -84,3 +84,20 @@ export async function setRolesViaApi(userId: string, roles: string[]) {
   await admin.patch(`/api/v1/admin/users/${userId}`, { roles });
   await admin.dispose();
 }
+
+/** Signs a user out everywhere through the admin API (their next request answers 401). */
+export async function revokeSessionsViaApi(userId: string) {
+  const admin = await apiAs("admin");
+  await admin.post(`/api/v1/admin/users/${userId}/sessions/revoke`, undefined, 200);
+  await admin.dispose();
+}
+
+/** Leaves the tab and comes back (TanStack listens to `visibilitychange` on window). */
+export async function returnToTab(page: Page) {
+  await page.evaluate(() => {
+    for (const state of ["hidden", "visible"]) {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+      window.dispatchEvent(new Event("visibilitychange"));
+    }
+  });
+}

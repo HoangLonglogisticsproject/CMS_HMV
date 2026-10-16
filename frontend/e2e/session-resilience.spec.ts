@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { E2E } from "./env";
-import { createArticleViaApi, createStaffViaApi, setRolesViaApi, toast, uniqueSlug } from "./helpers";
+import { createArticleViaApi, createStaffViaApi, returnToTab, setRolesViaApi, toast, uniqueSlug } from "./helpers";
 
 /**
  * The session query (GET /auth/session) refetches in the background: on reconnect once stale, on returning to the tab
@@ -38,16 +38,6 @@ async function staleSessionReconnect(page: Page, context: BrowserContext) {
   await page.clock.fastForward("06:00");
   await context.setOffline(true);
   await context.setOffline(false);
-}
-
-/** Leaves the tab and comes back (TanStack listens to `visibilitychange` on window). */
-async function returnToTab(page: Page) {
-  await page.evaluate(() => {
-    for (const state of ["hidden", "visible"]) {
-      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
-      window.dispatchEvent(new Event("visibilitychange"));
-    }
-  });
 }
 
 async function draftInEditor(page: Page, prefix: string, withEn: boolean) {

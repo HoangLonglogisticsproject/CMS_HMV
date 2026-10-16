@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -26,9 +27,21 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const { data: session, isPending, isError, isFetching, error, refetch } = useSession();
   // Last signed-in user in this tab (derived while rendering; React's "store info from previous renders" pattern).
   const [lastUser, setLastUser] = useState<{ id: string; email: string } | null>(null);
-  if (session && lastUser?.id !== session.user.id) setLastUser({ id: session.user.id, email: session.user.email });
+  // Another account took over this tab: re-login as someone else in the dialog below, or a sign-in in another tab
+  // (the session cookie is per browser). Nothing of the previous user's screen may stay mounted, readable or
+  // submittable under the new identity.
+  const [identityChanged, setIdentityChanged] = useState(false);
+  if (session && lastUser?.id !== session.user.id) {
+    if (lastUser) setIdentityChanged(true);
+    setLastUser({ id: session.user.id, email: session.user.email });
+  }
   // Signed in earlier in this tab and did not sign out: the session expired or was revoked.
   const expired = !session && Boolean(lastUser) && !authState.signedOut;
+
+  useEffect(() => {
+    // Only a full reload reliably drops the previous account's drafts, editor state, query cache and CSRF token.
+    if (identityChanged) window.location.replace("/");
+  }, [identityChanged]);
 
   useEffect(() => {
     const offExpired = onSessionExpired(() => {
@@ -47,6 +60,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     if (session === null && !expired) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [session, expired, pathname, router]);
 
+  if (identityChanged) return <Centered>Đang chuyển sang tài khoản khác...</Centered>;
   if (isPending) return <Centered>Đang kiểm tra phiên đăng nhập...</Centered>;
   // Only a session that never loaded may block the app. When a background refetch fails, TanStack keeps the last
   // session and sets `error`: the app, open editors and unsaved work stay mounted and a banner offers a retry.
@@ -80,19 +94,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       )}
+      {/* Signed out: the app stays mounted (drafts survive) but must not be readable on a shared screen. The regular
+          dialog backdrop is translucent and drawers live in their own portals, so cover the whole viewport. */}
+      {expired &&
+        createPortal(
+          <div data-testid="reauth-privacy-cover" aria-hidden className="fixed inset-0 z-50 bg-[#F8FAFC]" />,
+          document.body,
+        )}
       <Dialog open={expired}>
         <DialogContent className="max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
           <DialogTitle className="text-sm font-bold text-[#123D68]">Phiên đăng nhập đã hết hạn</DialogTitle>
           <DialogDescription className="text-xs text-slate-500">
-            Đăng nhập lại để tiếp tục. Nội dung bạn đang soạn vẫn được giữ nguyên trên màn hình.
+            Đăng nhập lại để tiếp tục. Nội dung đang soạn được giữ lại (đang ẩn) và hiện lại khi bạn đăng nhập đúng
+            tài khoản này. Đăng nhập bằng tài khoản khác sẽ huỷ nội dung chưa lưu.
           </DialogDescription>
-          <LoginForm
-            keepCacheForUserId={lastUser?.id}
-            defaultEmail={lastUser?.email}
-            onSuccess={(s) => {
-              if (s.user.id !== lastUser?.id) router.replace("/");
-            }}
-          />
+          {/* A different account is handled above (identityChanged): unmount, then a full reload. */}
+          <LoginForm keepCacheForUserId={lastUser?.id} defaultEmail={lastUser?.email} />
         </DialogContent>
       </Dialog>
     </>

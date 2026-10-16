@@ -46,7 +46,12 @@ export function useLogin(keepCacheForUserId?: string) {
     mutationFn: (body: { email: string; password: string }) => call(api.POST("/api/v1/auth/login", { body })),
     onSuccess: (session) => {
       authState.signedOut = false;
-      if (session.user.id !== keepCacheForUserId) queryClient.clear(); // never show another user's cached data
+      if (session.user.id !== keepCacheForUserId) {
+        // Never show another user's cached data. The session query itself is kept (and overwritten just below): a
+        // removed query would leave its subscribers, AuthGate included, blind to the new identity.
+        queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== queryKeys.auth.session[0] });
+        queryClient.getMutationCache().clear();
+      }
       setCsrfToken(session.csrfToken);
       queryClient.setQueryData(queryKeys.auth.session, session);
     },
