@@ -68,3 +68,19 @@ export async function createArticleViaApi(user: E2EUser, slug: string, withEn = 
 }
 
 export const toast = (page: Page, text: string | RegExp) => page.locator("[data-sonner-toast]").filter({ hasText: text });
+
+/** A throwaway account created through the admin API on the _test database (never one of the shared E2E users). */
+export async function createStaffViaApi(prefix: string, roles: string[], password: string) {
+  const email = `${uniqueSlug(prefix)}@e2e.test`;
+  const admin = await apiAs("admin");
+  const user = await admin.post("/api/v1/admin/users", { email, displayName: "Nhân Viên Tạm", roles, password }, 201);
+  await admin.dispose();
+  return { id: user.id as string, email };
+}
+
+/** Replaces a user's roles through the admin API (takes effect on the server immediately). */
+export async function setRolesViaApi(userId: string, roles: string[]) {
+  const admin = await apiAs("admin");
+  await admin.patch(`/api/v1/admin/users/${userId}`, { roles });
+  await admin.dispose();
+}

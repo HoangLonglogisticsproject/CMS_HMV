@@ -54,6 +54,15 @@ export function onSessionExpired(listener: () => void) {
   return () => void expiredListeners.delete(listener);
 }
 
+// ---------- Permission change signal ----------
+
+const deniedListeners = new Set<() => void>();
+/** Fires when a request answers 403 PERMISSION_DENIED: the permissions on screen are older than the server's. */
+export function onPermissionDenied(listener: () => void) {
+  deniedListeners.add(listener);
+  return () => void deniedListeners.delete(listener);
+}
+
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const AUTH_PATHS = ["/api/v1/auth/login", "/api/v1/auth/session"];
 
@@ -75,8 +84,12 @@ api.use(middleware);
 
 function toApiError(status: number, body: unknown): ApiError {
   const e = body as Partial<Schemas["ErrorResponse"]> | undefined;
-  if (e && typeof e.code === "string") return new ApiError(status, e.code, e.message ?? e.code, e.details);
-  return new ApiError(status, status === 401 ? "UNAUTHENTICATED" : "INTERNAL_ERROR", `HTTP ${status}`);
+  const err =
+    e && typeof e.code === "string"
+      ? new ApiError(status, e.code, e.message ?? e.code, e.details)
+      : new ApiError(status, status === 401 ? "UNAUTHENTICATED" : "INTERNAL_ERROR", `HTTP ${status}`);
+  if (err.code === "PERMISSION_DENIED") deniedListeners.forEach((listener) => listener());
+  return err;
 }
 
 /** Awaits an openapi-fetch call and returns its data, or throws ApiError (network failures included). */

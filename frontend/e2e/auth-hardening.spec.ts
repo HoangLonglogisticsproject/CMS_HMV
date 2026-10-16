@@ -1,19 +1,13 @@
 import { expect, request as playwrightRequest, test, type Page } from "@playwright/test";
 import { E2E } from "./env";
-import { apiAs, createArticleViaApi, loginViaUi, toast, uniqueSlug } from "./helpers";
+import { apiAs, createArticleViaApi, createStaffViaApi, loginViaUi, toast, uniqueSlug } from "./helpers";
 
 // Throwaway staff accounts are created through the admin API on the _test database; shared E2E users stay untouched.
 const PASSWORD_A = "first passphrase for staff";
 const PASSWORD_B = "second passphrase for staff";
 const USERS_NAV = "Người dùng & phân quyền";
 
-async function staffAccount(roles: string[] = ["EDITOR"]) {
-  const email = `${uniqueSlug("staff")}@e2e.test`;
-  const admin = await apiAs("admin");
-  const user = await admin.post("/api/v1/admin/users", { email, displayName: "Nhân Viên Tạm", roles, password: PASSWORD_A }, 201);
-  await admin.dispose();
-  return { id: user.id as string, email };
-}
+const staffAccount = (roles: string[] = ["EDITOR"]) => createStaffViaApi("staff", roles, PASSWORD_A);
 
 /** Status of a sign-in attempt through the API (no browser state involved). */
 async function loginStatus(email: string, password: string) {

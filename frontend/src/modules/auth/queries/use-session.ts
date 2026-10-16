@@ -27,6 +27,9 @@ export function useSession() {
     },
     staleTime: 5 * 60_000,
     retry: false,
+    // Coming back to the tab re-reads roles/permissions (one GET; the app-wide default is off). A failure keeps the
+    // cached session (AuthGate shows a banner), so this never unmounts the app or loses unsaved work.
+    refetchOnWindowFocus: "always",
   });
 }
 

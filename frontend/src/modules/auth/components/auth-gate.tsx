@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { onSessionExpired, setCsrfToken } from "@/lib/api/client";
+import { onPermissionDenied, onSessionExpired, setCsrfToken } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import { authState, useSession } from "../queries/use-session";
@@ -23,28 +23,35 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { data: session, isPending, isError, error, refetch } = useSession();
+  const { data: session, isPending, isError, isFetching, error, refetch } = useSession();
   // Last signed-in user in this tab (derived while rendering; React's "store info from previous renders" pattern).
   const [lastUser, setLastUser] = useState<{ id: string; email: string } | null>(null);
   if (session && lastUser?.id !== session.user.id) setLastUser({ id: session.user.id, email: session.user.email });
   // Signed in earlier in this tab and did not sign out: the session expired or was revoked.
   const expired = !session && Boolean(lastUser) && !authState.signedOut;
 
-  useEffect(
-    () =>
-      onSessionExpired(() => {
-        setCsrfToken(null);
-        queryClient.setQueryData(queryKeys.auth.session, null);
-      }),
-    [queryClient],
-  );
+  useEffect(() => {
+    const offExpired = onSessionExpired(() => {
+      setCsrfToken(null);
+      queryClient.setQueryData(queryKeys.auth.session, null);
+    });
+    // A 403 means the permissions on screen are stale: reload them (the server already refused the request).
+    const offDenied = onPermissionDenied(() => void queryClient.invalidateQueries({ queryKey: queryKeys.auth.session }));
+    return () => {
+      offExpired();
+      offDenied();
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     if (session === null && !expired) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [session, expired, pathname, router]);
 
   if (isPending) return <Centered>Đang kiểm tra phiên đăng nhập...</Centered>;
-  if (isError) {
+  // Only a session that never loaded may block the app. When a background refetch fails, TanStack keeps the last
+  // session and sets `error`: the app, open editors and unsaved work stay mounted and a banner offers a retry.
+  // (A 401 is not an error here: the query resolves to null and the re-login dialog below takes over.)
+  if (isError && session === undefined) {
     return (
       <Centered>
         <div className="space-y-3 text-center">
@@ -61,6 +68,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
+      {isError && (
+        <div
+          role="alert"
+          data-testid="session-connection-error"
+          className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-lg"
+        >
+          <span>{errorMessage(error)} Nội dung đang soạn vẫn được giữ nguyên.</span>
+          <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" disabled={isFetching} onClick={() => void refetch()}>
+            Thử lại
+          </Button>
+        </div>
+      )}
       <Dialog open={expired}>
         <DialogContent className="max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
           <DialogTitle className="text-sm font-bold text-[#123D68]">Phiên đăng nhập đã hết hạn</DialogTitle>
