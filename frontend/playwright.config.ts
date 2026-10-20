@@ -9,6 +9,7 @@ import { E2E, backendDir } from "./e2e/env";
  */
 export default defineConfig({
   testDir: "./e2e",
+  forbidOnly: !!process.env.CI, // a stray test.only must not silently skip the rest of the suite in CI
   fullyParallel: false,
   workers: 1, // one shared database
   timeout: 90_000,

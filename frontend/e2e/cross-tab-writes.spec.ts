@@ -12,10 +12,11 @@ const PASSWORD = "cross tab race passphrase";
 const ROLES = ["EDITOR", "REVIEWER"]; // write + review + publish: a write accepted as B would succeed
 const VI_TITLE = "Nhập tiêu đề bài viết phân tích...";
 
+// PATCH …/draft, POST …/translations/vi/approve, POST …/publish
 const WRITES = {
-  save: { method: "PATCH", path: /\/draft$/ },
-  approve: { method: "POST", path: /\/translations\/vi\/approve$/ },
-  publish: { method: "POST", path: /\/publish$/ },
+  save: /\/draft$/,
+  approve: /\/translations\/vi\/approve$/,
+  publish: /\/publish$/,
 } as const;
 
 /** Tab A shows A's editor (with an unsaved draft for a save); then B signs in from another tab of the same browser. */
@@ -43,14 +44,23 @@ async function aThenBInAnotherTab(page: Page, context: BrowserContext, action: k
   return { a, b, article, before, draft };
 }
 
-const writeResponse = (page: Page, action: keyof typeof WRITES) => {
-  const { method, path } = WRITES[action];
-  return page.waitForResponse((r) => r.request().method() === method && path.test(new URL(r.url()).pathname));
-};
+/**
+ * The server's answers to a write, read in the test process: a refused write makes the tab reload (handing over to B),
+ * and the browser then discards the response, so `page.waitForResponse(...).json()` would race the reload.
+ */
+async function serverAnswers(page: Page, path: RegExp) {
+  const answers: { status: number; code?: string }[] = [];
+  await page.route(path, async (route) => {
+    const response = await route.fetch(); // the same request: B's cookie, the tab's CSRF token
+    answers.push({ status: response.status(), code: (await response.json().catch(() => ({}))).code });
+    await route.fulfill({ response }).catch(() => undefined); // the tab may already be reloading
+  });
+  return answers;
+}
 
 async function staleTabWrite(page: Page, context: BrowserContext, action: keyof typeof WRITES) {
   const setup = await aThenBInAnotherTab(page, context, action);
-  const response = writeResponse(page, action);
+  const answers = await serverAnswers(page, WRITES[action]);
   const workflow = page.getByTestId("article-workflow");
   if (action === "save") await page.getByRole("button", { name: "Lưu Bản Nháp", exact: true }).click();
   if (action === "approve") await workflow.getByRole("button", { name: "Duyệt VI", exact: true }).click();
@@ -58,7 +68,8 @@ async function staleTabWrite(page: Page, context: BrowserContext, action: keyof 
     page.once("dialog", (d) => void d.accept());
     await workflow.getByRole("button", { name: "Xuất bản", exact: true }).click();
   }
-  return { ...setup, res: await response };
+  await expect.poll(() => answers.length).toBe(1);
+  return { ...setup, answer: answers[0] };
 }
 
 async function detail(id: string) {
@@ -73,11 +84,10 @@ for (const action of Object.keys(WRITES) as (keyof typeof WRITES)[]) {
     page,
     context,
   }) => {
-    const { b, article, before, draft, res } = await staleTabWrite(page, context, action);
+    const { b, article, before, draft, answer } = await staleTabWrite(page, context, action);
 
     // The request is sent with B's cookie but A's CSRF token: the server refuses it.
-    expect(res.status()).toBe(403);
-    expect((await res.json()).code).toBe("CSRF_TOKEN_INVALID");
+    expect(answer).toEqual({ status: 403, code: "CSRF_TOKEN_INVALID" });
 
     // Server state: unchanged, and nothing attributed to B.
     const after = await detail(article.id);
@@ -118,13 +128,7 @@ test("a save clicked in the instant the tab learns about B (before the screen sw
       };
     }
   });
-  // The tab reloads right after, which aborts the response in the browser: read the server's answer here instead.
-  const answers: { status: number; code?: string }[] = [];
-  await page.route(/\/draft$/, async (route) => {
-    const response = await route.fetch();
-    answers.push({ status: response.status(), code: (await response.json().catch(() => ({}))).code });
-    await route.fulfill({ response }).catch(() => undefined);
-  });
+  const answers = await serverAnswers(page, WRITES.save);
   await returnToTab(page); // the tab re-reads its session and gets B
   await expect.poll(() => answers.length).toBe(1); // the click did land on A's editor and sent the save
   console.log(`RACE gap-save article=${article.id} b=${b.id} status=${answers[0].status}`);
