@@ -34,5 +34,6 @@ Accepted — implemented for Articles (`backend/src/modules/articles`).
 - Storage grows by one revision per save (fine for explicit saves; autosave would need coalescing).
 - Single live revision: if a translator has an unapproved edit to a live locale, it blocks publishing
   other locales until it is approved or reverted. Per-locale published pointers are the upgrade if that hurts.
-- Pages, Commodities and other scaffolded tables still use the old `SupportedLocale` enum and status-on-row
-  design; they should adopt this pattern when their slices are built.
+- Pages adopted this pattern with per-locale publication ([ADR-008](./ADR-008-website-pages.md)). Commodities and
+  the other scaffolded tables still use the old `SupportedLocale` enum and status-on-row design; they should adopt
+  it when their slices are built.

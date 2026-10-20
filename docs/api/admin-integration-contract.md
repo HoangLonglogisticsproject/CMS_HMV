@@ -2,7 +2,8 @@
 
 Status (2026-10-14): **integrated**. The CMS frontend talks to the NestJS API for authentication, EcoNews
 articles and the media library; verified by backend integration tests (PostgreSQL) and browser E2E tests against
-the real stack (`frontend/e2e`). Dashboard, Pages, Commodities and Supply-chain stages still use the mock adapter.
+the real stack (`frontend/e2e`). Website pages (About) use the Pages API since 2026-10-20 (§9). Dashboard,
+Commodities and Supply-chain stages still use the mock adapter.
 
 Source of truth: [`openapi-spec.json`](./openapi-spec.json), exported from the built API
 (`pnpm --filter backend openapi:export`). Frontend types are generated from it — never hand-written:
@@ -50,9 +51,9 @@ API **same-site** (e.g. `cms.hmvglobal.com` + `api.hmvglobal.com`) because the c
 | Role | Permissions |
 |---|---|
 | ADMIN | all |
-| EDITOR | `article:read`, `article:write`, `media:read`, `media:write` |
-| REVIEWER | `article:read`, `article:review`, `article:publish`, `article:archive`, `media:read` |
-| VIEWER | `article:read`, `media:read` |
+| EDITOR | `article:read`, `article:write`, `media:read`, `media:write`, `page:read`, `page:write` |
+| REVIEWER | `article:read`, `article:review`, `article:publish`, `article:archive`, `media:read`, `page:read`, `page:review`, `page:publish` |
+| VIEWER | `article:read`, `media:read`, `page:read` |
 
 ## 3. Errors
 
@@ -160,5 +161,26 @@ Not changed without a business decision.
 
 ## 8. Not available yet
 
-Dashboard metrics/activity, Pages & sections, Commodities, Supply-chain stages, user management, article delete,
+Dashboard metrics/activity, pages other than About, page unpublish, Commodities, Supply-chain stages, user management, article delete,
 media delete, related commodities, review queue/notifications, scheduled publishing.
+
+## 9. Website pages
+
+Model: [ADR-008](../decisions/ADR-008-website-pages.md). Hooks: `modules/content/pages/queries/use-pages.ts`.
+Form layout per page type: `modules/content/pages/utils/page-form.ts` (mirrors the backend content class).
+
+| Endpoint | Permission | Hook |
+|---|---|---|
+| `GET /admin/pages` | `page:read` | `usePages` |
+| `GET /admin/pages/:key` | `page:read` | `usePageDetail` |
+| `PATCH /admin/pages/:key/draft` `{ expectedRevision, translations: [{ locale, content?, seoTitle?, seoDescription? }] }` | `page:write` | `useSavePageDraft` |
+| `POST /admin/pages/:key/translations/:locale/submit` | `page:write` | `usePageStep` |
+| `POST …/approve` · `POST …/request-changes` `{ note }` | `page:review` | `usePageStep` |
+| `POST …/publish` | `page:publish` | `usePageStep` |
+
+- Every write sends `expectedRevision` (the detail's `revision`; 0 before the first save) → `409 REVISION_CONFLICT`.
+- Per locale, `state` is `DRAFT | IN_REVIEW | APPROVED | CHANGES_REQUESTED` for the current draft content; an edit
+  resets it to `DRAFT`. `missingFields` lists what blocks submission; `reviewNote` shows the reviewer's request.
+- Content validation errors: `400 VALIDATION_FAILED` with `translations[i].content.…` paths; incomplete
+  submission: `422 TRANSLATION_INCOMPLETE`; out-of-order steps: `409 TRANSLATION_NOT_SUBMITTED` /
+  `TRANSLATION_NOT_APPROVED`.

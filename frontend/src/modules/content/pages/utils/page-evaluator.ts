@@ -1,4 +1,4 @@
-import { PageContentItem, PageSeoMetadata } from "@/lib/mocks/types";
+import { PageSeoMetadata } from "@/lib/mocks/types";
 
 export interface SeoCriterion {
   id: string;
@@ -92,84 +92,5 @@ export function evaluatePageSeo(seo?: PageSeoMetadata, locale: "vi" | "en" = "vi
     totalCount: criteria.length,
     criteria,
     criticalIssues,
-  };
-}
-
-export interface LocalizablePageInput {
-  titleVi?: string;
-  titleEn?: string;
-  slugVi?: string;
-  slugEn?: string;
-  seo?: {
-    metaTitleVi?: string;
-    metaTitleEn?: string;
-    metaDescriptionVi?: string;
-    metaDescriptionEn?: string;
-  };
-  sections?: Array<{
-    sectionType?: string;
-    titleVi?: string;
-    titleEn?: string;
-    descriptionVi?: string;
-    descriptionEn?: string;
-  }>;
-}
-
-export function evaluatePageLocalization(page: LocalizablePageInput): {
-  viPercentage: number;
-  enPercentage: number;
-  isFullyLocalized: boolean;
-  missingEnFields: string[];
-} {
-  let viPoints = 0;
-  let enPoints = 0;
-  let maxPoints = 0;
-  const missingEn: string[] = [];
-
-  // Title
-  maxPoints += 10;
-  if (page.titleVi?.trim()) viPoints += 10;
-  if (page.titleEn?.trim()) enPoints += 10;
-  else missingEn.push("Tiêu đề trang tiếng Anh");
-
-  // Slug
-  maxPoints += 5;
-  if (page.slugVi?.trim()) viPoints += 5;
-  if (page.slugEn?.trim()) enPoints += 5;
-  else missingEn.push("URL slug tiếng Anh");
-
-  // SEO
-  maxPoints += 10;
-  if (page.seo?.metaTitleVi?.trim()) viPoints += 5;
-  if (page.seo?.metaTitleEn?.trim()) enPoints += 5;
-  else missingEn.push("Meta title tiếng Anh");
-
-  if (page.seo?.metaDescriptionVi?.trim()) viPoints += 5;
-  if (page.seo?.metaDescriptionEn?.trim()) enPoints += 5;
-  else missingEn.push("Meta description tiếng Anh");
-
-  // Sections
-  const sections = page.sections || [];
-  if (sections.length > 0) {
-    const pointPerSec = Math.floor(70 / sections.length);
-    sections.forEach((sec, idx) => {
-      maxPoints += pointPerSec;
-      const hasVi = Boolean(sec.titleVi?.trim() && sec.descriptionVi?.trim());
-      const hasEn = Boolean(sec.titleEn?.trim() && sec.descriptionEn?.trim());
-
-      if (hasVi) viPoints += pointPerSec;
-      if (hasEn) enPoints += pointPerSec;
-      else missingEn.push(`Section #${idx + 1} (${sec.sectionType})`);
-    });
-  }
-
-  const viPercentage = maxPoints > 0 ? Math.round((viPoints / maxPoints) * 100) : 100;
-  const enPercentage = maxPoints > 0 ? Math.round((enPoints / maxPoints) * 100) : 0;
-
-  return {
-    viPercentage,
-    enPercentage,
-    isFullyLocalized: viPercentage >= 85 && enPercentage >= 85,
-    missingEnFields: missingEn,
   };
 }

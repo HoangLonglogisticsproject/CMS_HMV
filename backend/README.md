@@ -4,7 +4,7 @@ NestJS 12 + Prisma 6 + PostgreSQL 16. Owns data, business rules, authentication/
 contract. Frontend integration: [`../docs/api/admin-integration-contract.md`](../docs/api/admin-integration-contract.md).
 
 Implemented: **auth & RBAC**, **articles** (revisions, EN/VI, approval, publish, archive, preview, public
-API), **media** (upload, metadata, usage tracking, local + R2 storage). Not yet: pages, commodities,
+API), **media** (upload, metadata, usage tracking, local + R2 storage). Also **pages** (typed website pages, per-locale review/publish, public read API; ADR-008). Not yet: commodities,
 supply-chain stages, dashboard, user management.
 
 ## Run locally

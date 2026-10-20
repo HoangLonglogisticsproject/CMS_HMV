@@ -22,3 +22,50 @@ export function makePng(width: number, height: number): Buffer {
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
+
+/** A complete `about` page content (every field filled), labelled so it is recognisable in a test database. */
+export function aboutContent(label: string) {
+  const item = (n: number) => ({
+    title: `${label} title ${n}`,
+    text: `${label} text ${n}`,
+  });
+  return {
+    hero: { title: `${label} About`, lead: `${label} lead` },
+    purpose: {
+      eyebrow: `${label} eyebrow`,
+      title: `${label} purpose`,
+      intro: `${label} intro`,
+    },
+    vision: {
+      label: 'Vision',
+      quote: `${label} quote`,
+      goalTitle: `${label} goal`,
+      goalText: `${label} goal text`,
+      markets: [{ name: 'Singapore', flag: '🇸🇬' }],
+    },
+    mission: {
+      label: 'Mission',
+      title: `${label} mission`,
+      text: `${label} mission text`,
+      highlights: [item(1)],
+    },
+    values: { title: `${label} values`, items: [item(1), item(2)] },
+    team: {
+      eyebrow: `${label} team eyebrow`,
+      title: `${label} team`,
+      intro: `${label} team intro`,
+      members: [
+        {
+          name: 'Test Person',
+          role: 'Founder',
+          badge: '10 Years',
+          bio: `${label} bio`,
+          specialties: ['Trade'],
+        },
+      ],
+      closingTitle: `${label} closing`,
+      closingText: `${label} closing text`,
+      ctaLabel: 'Partner with us',
+    },
+  };
+}

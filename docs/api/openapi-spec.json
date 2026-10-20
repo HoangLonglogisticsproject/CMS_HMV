@@ -1866,6 +1866,739 @@
         ]
       }
     },
+    "/api/v1/admin/pages": {
+      "get": {
+        "operationId": "AdminPages_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}": {
+      "get": {
+        "operationId": "AdminPages_get",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}/draft": {
+      "patch": {
+        "operationId": "AdminPages_saveDraft",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePageDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saves a new draft revision. Published content is untouched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "UNKNOWN_LOCALE | TRANSLATION_INCOMPLETE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}/translations/{locale}/submit": {
+      "post": {
+        "operationId": "AdminPages_submit",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageRevisionRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submits a complete translation for review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "TRANSLATION_INCOMPLETE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}/translations/{locale}/approve": {
+      "post": {
+        "operationId": "AdminPages_approve",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageRevisionRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approves exactly the submitted content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT | TRANSLATION_NOT_SUBMITTED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}/translations/{locale}/request-changes": {
+      "post": {
+        "operationId": "AdminPages_requestChanges",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPageChangesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sends a submitted or approved translation back to the editor with a note.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT | TRANSLATION_NOT_SUBMITTED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/admin/pages/{key}/translations/{locale}/publish": {
+      "post": {
+        "operationId": "AdminPages_publish",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageRevisionRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Makes the approved draft of this locale live. Other locales are untouched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "REVISION_CONFLICT | TRANSLATION_NOT_APPROVED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Pages"
+        ]
+      }
+    },
+    "/api/v1/public/pages/{key}": {
+      "get": {
+        "operationId": "PublicPages_get",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+              "default": "vi",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UNKNOWN_LOCALE | VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PAGE_NOT_FOUND (unknown page, or this locale is not published)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public · Pages"
+        ]
+      }
+    },
     "/api/v1/admin/users": {
       "get": {
         "operationId": "Users_list",
@@ -2425,6 +3158,10 @@
           "article:archive",
           "media:read",
           "media:write",
+          "page:read",
+          "page:write",
+          "page:review",
+          "page:publish",
           "user:manage"
         ]
       },
@@ -2495,6 +3232,7 @@
           "RATE_LIMITED",
           "NOT_FOUND",
           "ARTICLE_NOT_FOUND",
+          "PAGE_NOT_FOUND",
           "TRANSLATION_NOT_FOUND",
           "MEDIA_NOT_FOUND",
           "CONFLICT",
@@ -2503,6 +3241,7 @@
           "ARTICLE_ARCHIVED",
           "ARTICLE_NOT_ARCHIVED",
           "TRANSLATION_NOT_APPROVED",
+          "TRANSLATION_NOT_SUBMITTED",
           "TRANSLATION_INCOMPLETE",
           "RICH_CONTENT_INVALID",
           "UNKNOWN_LOCALE",
@@ -3732,6 +4471,657 @@
           "pageSize",
           "total",
           "items"
+        ]
+      },
+      "PageTranslationSummary": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_REVIEW",
+              "APPROVED",
+              "CHANGES_REQUESTED"
+            ]
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "The locale is served by the public API."
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "The draft differs from what the public sees (always true when not live)."
+          }
+        },
+        "required": [
+          "locale",
+          "state",
+          "isLive",
+          "hasUnpublishedChanges"
+        ]
+      },
+      "PageSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "Draft title in the first available locale (vi first); null when never saved."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Current draft revision; 0 when the page was never saved."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageTranslationSummary"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "revision",
+          "updatedAt",
+          "translations"
+        ]
+      },
+      "PageListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageSummaryResponse"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PageHero": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "lead": {
+            "type": "string",
+            "maxLength": 800
+          }
+        },
+        "required": [
+          "title",
+          "lead"
+        ]
+      },
+      "AboutPurpose": {
+        "type": "object",
+        "properties": {
+          "eyebrow": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "intro": {
+            "type": "string",
+            "maxLength": 800
+          }
+        },
+        "required": [
+          "eyebrow",
+          "title",
+          "intro"
+        ]
+      },
+      "AboutMarket": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "flag": {
+            "type": "string",
+            "description": "Emoji flag shown next to the market name.",
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "name",
+          "flag"
+        ]
+      },
+      "AboutVision": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "goalTitle": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "goalText": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "markets": {
+            "description": "Target markets, in display order.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AboutMarket"
+            }
+          }
+        },
+        "required": [
+          "label",
+          "quote",
+          "goalTitle",
+          "goalText",
+          "markets"
+        ]
+      },
+      "TitledText": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 800
+          }
+        },
+        "required": [
+          "title",
+          "text"
+        ]
+      },
+      "AboutMission": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "highlights": {
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TitledText"
+            }
+          }
+        },
+        "required": [
+          "label",
+          "title",
+          "text",
+          "highlights"
+        ]
+      },
+      "AboutValues": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "items": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TitledText"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "items"
+        ]
+      },
+      "AboutTeamMember": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "badge": {
+            "type": "string",
+            "description": "Short credential shown as a badge, e.g. \"30 Years Experience\".",
+            "maxLength": 80
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 800
+          },
+          "specialties": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 80
+            }
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "badge",
+          "bio",
+          "specialties"
+        ]
+      },
+      "AboutTeam": {
+        "type": "object",
+        "properties": {
+          "eyebrow": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "intro": {
+            "type": "string",
+            "maxLength": 800
+          },
+          "members": {
+            "description": "In display order; the website assigns icons by position.",
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AboutTeamMember"
+            }
+          },
+          "closingTitle": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "closingText": {
+            "type": "string",
+            "maxLength": 800
+          },
+          "ctaLabel": {
+            "type": "string",
+            "description": "Label of the button linking to the contact page.",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "eyebrow",
+          "title",
+          "intro",
+          "members",
+          "closingTitle",
+          "closingText",
+          "ctaLabel"
+        ]
+      },
+      "AboutPageContent": {
+        "type": "object",
+        "properties": {
+          "hero": {
+            "$ref": "#/components/schemas/PageHero"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/AboutPurpose"
+          },
+          "vision": {
+            "$ref": "#/components/schemas/AboutVision"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/AboutMission"
+          },
+          "values": {
+            "$ref": "#/components/schemas/AboutValues"
+          },
+          "team": {
+            "$ref": "#/components/schemas/AboutTeam"
+          }
+        },
+        "required": [
+          "hero",
+          "purpose",
+          "vision",
+          "mission",
+          "values",
+          "team"
+        ]
+      },
+      "PageTranslationResponse": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "DRAFT",
+              "IN_REVIEW",
+              "APPROVED",
+              "CHANGES_REQUESTED"
+            ],
+            "type": "string"
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "The locale is served by the public API."
+          },
+          "hasUnpublishedChanges": {
+            "type": "boolean",
+            "description": "The draft differs from what the public sees (always true when not live)."
+          },
+          "content": {
+            "$ref": "#/components/schemas/AboutPageContent"
+          },
+          "contentVersion": {
+            "type": "number"
+          },
+          "seoTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "seoDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 of content + SEO fields. Reviews and publications bind to it."
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "The reviewer's note from the last \"request changes\", until the translation is approved."
+          },
+          "missingFields": {
+            "description": "Fields that must be filled before this translation can be submitted.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "publishedRevision": {
+            "type": "number",
+            "nullable": true,
+            "description": "Revision the live locale is served from."
+          },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "locale",
+          "state",
+          "isLive",
+          "hasUnpublishedChanges",
+          "content",
+          "contentVersion",
+          "seoTitle",
+          "seoDescription",
+          "contentHash",
+          "reviewNote",
+          "missingFields",
+          "publishedRevision",
+          "publishedAt"
+        ]
+      },
+      "PageRevisionSummary": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "locales": {
+            "description": "Locales present in this revision.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "number",
+          "createdAt",
+          "createdBy",
+          "locales"
+        ]
+      },
+      "PageDetailResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "Draft title in the first available locale (vi first); null when never saved."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Current draft revision; 0 when the page was never saved. Send it back as `expectedRevision`."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageTranslationResponse"
+            }
+          },
+          "history": {
+            "description": "Latest revisions first (at most 20).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageRevisionSummary"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "revision",
+          "updatedAt",
+          "translations",
+          "history"
+        ]
+      },
+      "PageTranslationInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+            "example": "vi"
+          },
+          "content": {
+            "additionalProperties": true,
+            "description": "Full content for this locale; its shape depends on the page key (`about`: AboutPageContent). Omitted = unchanged. Required when adding a locale.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AboutPageContent"
+              }
+            ]
+          },
+          "seoTitle": {
+            "type": "string",
+            "nullable": true,
+            "description": "Omitted = unchanged, null or blank = use the page title.",
+            "maxLength": 200
+          },
+          "seoDescription": {
+            "type": "string",
+            "nullable": true,
+            "description": "Omitted = unchanged, null or blank = use the page lead.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "locale"
+        ]
+      },
+      "SavePageDraftDto": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "number",
+            "description": "The `revision` the client last loaded (0 for a page that was never saved). A mismatch returns 409 REVISION_CONFLICT.",
+            "minimum": 0
+          },
+          "translations": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageTranslationInput"
+            }
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "translations"
+        ]
+      },
+      "PageRevisionRefDto": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ]
+      },
+      "RequestPageChangesDto": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "number",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "description": "What the editor needs to change. Shown to editors until the translation is approved.",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "note"
+        ]
+      },
+      "PublicPageAlternate": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale"
+        ]
+      },
+      "PublicPage": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/PublicSeo"
+          },
+          "content": {
+            "$ref": "#/components/schemas/AboutPageContent"
+          },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "First publication of this locale."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Latest publication of this locale."
+          },
+          "alternates": {
+            "description": "Other live locales of the same page (same URL on the website).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPageAlternate"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "locale",
+          "title",
+          "seo",
+          "content",
+          "publishedAt",
+          "updatedAt",
+          "alternates"
         ]
       },
       "AdminUserResponse": {

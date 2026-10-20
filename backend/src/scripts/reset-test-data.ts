@@ -12,7 +12,9 @@ export async function resetTestData(prisma: PrismaClient) {
   }
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE audit_logs, sessions, user_roles, article_revision_media, article_slugs,
     article_published_locales, article_translation_approvals, article_revision_translations, article_revisions, articles,
+    page_published_locales, page_translation_reviews, page_revision_translations, page_revisions,
     media_asset_translations, media_assets, users CASCADE`);
+  // `pages` rows are reference data seeded by migrations (like locales), so they are kept.
 }
 
 if (require.main === module) {

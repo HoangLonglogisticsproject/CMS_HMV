@@ -3,6 +3,10 @@ export const queryKeys = {
   auth: {
     session: ["auth", "session"] as const,
   },
+  pages: {
+    list: ["pages", "list"] as const,
+    detail: (key: string) => ["pages", "detail", key] as const,
+  },
   articles: {
     all: ["articles"] as const,
     lists: ["articles", "list"] as const,
@@ -42,10 +46,5 @@ export const queryKeys = {
     list: (locale: string) => ["supply-chain", "stages", locale] as const,
     detail: (id: string, locale: string) =>
       ["supply-chain", "stages", id, locale] as const,
-  },
-  pages: {
-    all: ["pages"] as const,
-    list: (locale: string) => ["pages", "list", locale] as const,
-    detail: (id: string, locale: string) => ["pages", "detail", id, locale] as const,
   },
 };

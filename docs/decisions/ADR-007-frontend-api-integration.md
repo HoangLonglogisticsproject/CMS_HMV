@@ -28,7 +28,7 @@ never fake success.
 
 ## Consequences
 - Contract drift becomes a TypeScript error after `pnpm --filter frontend api:generate`.
-- Pages/Commodities/Stages/Dashboard remain on mocks until their APIs exist; mock code for articles and media was
+- Commodities/Stages/Dashboard remain on mocks until their APIs exist; mock code for articles, media and pages was
   removed so the two data sources never mix within a feature.
 - The UI received only integration-necessary additions (login, re-login and conflict dialogs, workflow panel,
   error/loading states); visual polish is tracked as Antigravity tasks in `frontend/docs/FRONTEND_HANDOFF.md`.

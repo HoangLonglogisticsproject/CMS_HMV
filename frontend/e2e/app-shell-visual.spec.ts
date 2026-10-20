@@ -5,7 +5,7 @@ import { ACTIVE_NAVIGATION_GROUPS, ROADMAP_FEATURES, TARGET_NAVIGATION_IA } from
 import fs from "fs";
 
 // What the E2E editor holds (EDITOR role); nav items behind other permissions are hidden for it.
-const EDITOR_PERMISSIONS = ["article:read", "article:write", "media:read", "media:write"];
+const EDITOR_PERMISSIONS = ["article:read", "article:write", "media:read", "media:write", "page:read", "page:write"];
 
 const ARTIFACT_DIR = "C:/Users/ACER/.gemini/antigravity-ide/brain/41a6b2dd-79f1-4d9c-a715-5e0275100df0";
 
@@ -227,7 +227,7 @@ test.describe("App Shell & Interaction Refinement Final Acceptance Audit", () =>
             email: "admin@e2e.test",
             displayName: "Quản Trị Viên",
             roles: ["ADMIN"],
-            permissions: ["article:archive", "article:publish", "article:read", "article:review", "article:write", "media:read", "media:write", "user:manage"],
+            permissions: ["article:archive", "article:publish", "article:read", "article:review", "article:write", "media:read", "media:write", "page:publish", "page:read", "page:review", "page:write", "user:manage"],
           },
           csrfToken: "mock-admin-csrf-token",
         }),

@@ -31,8 +31,8 @@ pnpm --filter frontend typecheck && pnpm --filter frontend lint && pnpm --filter
 
 ## Still on mock data (no backend API yet)
 
-Dashboard metrics/activity, Pages & sections, Commodities & products, Supply-chain stages, Users & settings screens.
-Mocks for articles and media were removed.
+Dashboard metrics/activity, Commodities & products, Supply-chain stages, Users & settings screens.
+Mocks for articles, media and pages were removed. Pages: About is CMS-managed (ADR-008); other pages are not modelled yet.
 
 ## Not production-ready yet
 
