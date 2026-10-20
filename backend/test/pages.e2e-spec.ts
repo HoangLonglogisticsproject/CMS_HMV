@@ -128,7 +128,7 @@ describe('Pages (PostgreSQL)', () => {
       save(2, [{ locale: 'vi', seoTitle: 'a' }]),
       save(2, [{ locale: 'vi', seoTitle: 'b' }]),
     ]);
-    expect(race.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(race.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
     expect(await t.prisma.pageRevision.count()).toBe(3);
     expect(
       await t.prisma.auditLog.count({ where: { action: 'page.update_draft' } }),
