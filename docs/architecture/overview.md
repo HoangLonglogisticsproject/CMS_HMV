@@ -18,7 +18,7 @@ CMS_HMV/
 │   │   └── lib/             # API client, auth, utils
 ├── backend/                 # NestJS modular architecture
 │   ├── src/
-│   │   ├── modules/         # auth, articles, media, health (supply-chain, pages: not built yet)
+│   │   ├── modules/         # auth, articles, pages, media, health (supply-chain: not built yet)
 │   │   ├── infrastructure/  # Database (Prisma), object storage (local / Cloudflare R2)
 │   │   ├── common/          # Errors, DTO helpers, audit
 │   │   └── scripts/         # OpenAPI export, user provisioning CLI

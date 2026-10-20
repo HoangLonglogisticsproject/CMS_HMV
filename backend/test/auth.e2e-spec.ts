@@ -32,6 +32,8 @@ describe('Authentication & RBAC (PostgreSQL)', () => {
       'article:write',
       'media:read',
       'media:write',
+      'page:read',
+      'page:write',
     ]);
     expect(res.body.csrfToken).toHaveLength(43);
 

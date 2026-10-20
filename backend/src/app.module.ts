@@ -7,6 +7,7 @@ import { ArticlesModule } from './modules/articles/articles.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
+import { PagesModule } from './modules/pages/pages.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { UsersModule } from './modules/users/users.module';
     HealthModule,
     MediaModule,
     ArticlesModule,
+    PagesModule,
     UsersModule,
   ],
 })

@@ -113,6 +113,7 @@ export const TARGET_NAVIGATION_IA: NavGroupConfig[] = [
         title: "Trang website",
         href: "/content/pages",
         icon: FileText,
+        permission: "page:read",
         isActiveRoute: true,
       },
       {

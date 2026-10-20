@@ -341,6 +341,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminPages_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminPages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AdminPages_saveDraft"];
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}/translations/{locale}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminPages_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}/translations/{locale}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminPages_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}/translations/{locale}/request-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminPages_requestChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{key}/translations/{locale}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminPages_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/pages/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PublicPages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -447,7 +575,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "article:read" | "article:write" | "article:review" | "article:publish" | "article:archive" | "media:read" | "media:write" | "user:manage";
+        Permission: "article:read" | "article:write" | "article:review" | "article:publish" | "article:archive" | "media:read" | "media:write" | "page:read" | "page:write" | "page:review" | "page:publish" | "user:manage";
         SessionUser: {
             permissions: components["schemas"]["Permission"][];
             id: string;
@@ -463,7 +591,7 @@ export interface components {
             expiresAt: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "PAGE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_NOT_SUBMITTED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN";
         ErrorResponse: {
             /** @example 409 */
             statusCode: number;
@@ -805,6 +933,181 @@ export interface components {
             pageSize: number;
             total: number;
             items: components["schemas"]["PublicArticleSummary"][];
+        };
+        PageTranslationSummary: {
+            locale: string;
+            /** @enum {string} */
+            state: "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED";
+            /** @description The locale is served by the public API. */
+            isLive: boolean;
+            /** @description The draft differs from what the public sees (always true when not live). */
+            hasUnpublishedChanges: boolean;
+        };
+        PageSummaryResponse: {
+            key: string;
+            /** @description Draft title in the first available locale (vi first); null when never saved. */
+            title: string | null;
+            /** @description Current draft revision; 0 when the page was never saved. */
+            revision: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+            translations: components["schemas"]["PageTranslationSummary"][];
+        };
+        PageListResponse: {
+            items: components["schemas"]["PageSummaryResponse"][];
+        };
+        PageHero: {
+            title: string;
+            lead: string;
+        };
+        AboutPurpose: {
+            eyebrow: string;
+            title: string;
+            intro: string;
+        };
+        AboutMarket: {
+            name: string;
+            /** @description Emoji flag shown next to the market name. */
+            flag: string;
+        };
+        AboutVision: {
+            label: string;
+            quote: string;
+            goalTitle: string;
+            goalText: string;
+            /** @description Target markets, in display order. */
+            markets: components["schemas"]["AboutMarket"][];
+        };
+        TitledText: {
+            title: string;
+            text: string;
+        };
+        AboutMission: {
+            label: string;
+            title: string;
+            text: string;
+            highlights: components["schemas"]["TitledText"][];
+        };
+        AboutValues: {
+            title: string;
+            items: components["schemas"]["TitledText"][];
+        };
+        AboutTeamMember: {
+            name: string;
+            role: string;
+            /** @description Short credential shown as a badge, e.g. "30 Years Experience". */
+            badge: string;
+            bio: string;
+            specialties: string[];
+        };
+        AboutTeam: {
+            eyebrow: string;
+            title: string;
+            intro: string;
+            /** @description In display order; the website assigns icons by position. */
+            members: components["schemas"]["AboutTeamMember"][];
+            closingTitle: string;
+            closingText: string;
+            /** @description Label of the button linking to the contact page. */
+            ctaLabel: string;
+        };
+        AboutPageContent: {
+            hero: components["schemas"]["PageHero"];
+            purpose: components["schemas"]["AboutPurpose"];
+            vision: components["schemas"]["AboutVision"];
+            mission: components["schemas"]["AboutMission"];
+            values: components["schemas"]["AboutValues"];
+            team: components["schemas"]["AboutTeam"];
+        };
+        PageTranslationResponse: {
+            locale: string;
+            /** @enum {string} */
+            state: "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED";
+            /** @description The locale is served by the public API. */
+            isLive: boolean;
+            /** @description The draft differs from what the public sees (always true when not live). */
+            hasUnpublishedChanges: boolean;
+            content: components["schemas"]["AboutPageContent"];
+            contentVersion: number;
+            seoTitle: string | null;
+            seoDescription: string | null;
+            /** @description SHA-256 of content + SEO fields. Reviews and publications bind to it. */
+            contentHash: string;
+            /** @description The reviewer's note from the last "request changes", until the translation is approved. */
+            reviewNote: string | null;
+            /** @description Fields that must be filled before this translation can be submitted. */
+            missingFields: string[];
+            /** @description Revision the live locale is served from. */
+            publishedRevision: number | null;
+            /** Format: date-time */
+            publishedAt: string | null;
+        };
+        PageRevisionSummary: {
+            number: number;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: components["schemas"]["UserRef"];
+            /** @description Locales present in this revision. */
+            locales: string[];
+        };
+        PageDetailResponse: {
+            key: string;
+            /** @description Draft title in the first available locale (vi first); null when never saved. */
+            title: string | null;
+            /** @description Current draft revision; 0 when the page was never saved. Send it back as `expectedRevision`. */
+            revision: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+            translations: components["schemas"]["PageTranslationResponse"][];
+            /** @description Latest revisions first (at most 20). */
+            history: components["schemas"]["PageRevisionSummary"][];
+        };
+        PageTranslationInput: {
+            /** @example vi */
+            locale: string;
+            /** @description Full content for this locale; its shape depends on the page key (`about`: AboutPageContent). Omitted = unchanged. Required when adding a locale. */
+            content?: {
+                [key: string]: unknown;
+            } & components["schemas"]["AboutPageContent"];
+            /** @description Omitted = unchanged, null or blank = use the page title. */
+            seoTitle?: string | null;
+            /** @description Omitted = unchanged, null or blank = use the page lead. */
+            seoDescription?: string | null;
+        };
+        SavePageDraftDto: {
+            /** @description The `revision` the client last loaded (0 for a page that was never saved). A mismatch returns 409 REVISION_CONFLICT. */
+            expectedRevision: number;
+            translations: components["schemas"]["PageTranslationInput"][];
+        };
+        PageRevisionRefDto: {
+            expectedRevision: number;
+        };
+        RequestPageChangesDto: {
+            expectedRevision: number;
+            /** @description What the editor needs to change. Shown to editors until the translation is approved. */
+            note: string;
+        };
+        PublicPageAlternate: {
+            locale: string;
+        };
+        PublicPage: {
+            key: string;
+            locale: string;
+            title: string;
+            seo: components["schemas"]["PublicSeo"];
+            content: components["schemas"]["AboutPageContent"];
+            /**
+             * Format: date-time
+             * @description First publication of this locale.
+             */
+            publishedAt: string;
+            /**
+             * Format: date-time
+             * @description Latest publication of this locale.
+             */
+            updatedAt: string;
+            /** @description Other live locales of the same page (same URL on the website). */
+            alternates: components["schemas"]["PublicPageAlternate"][];
         };
         AdminUserResponse: {
             id: string;
@@ -2187,6 +2490,536 @@ export interface operations {
             };
             /** @description UNKNOWN_LOCALE | VALIDATION_FAILED */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageListResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePageDraftDto"];
+            };
+        };
+        responses: {
+            /** @description Saves a new draft revision. Published content is untouched. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description REVISION_CONFLICT */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNKNOWN_LOCALE | TRANSLATION_INCOMPLETE */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageRevisionRefDto"];
+            };
+        };
+        responses: {
+            /** @description Submits a complete translation for review. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description REVISION_CONFLICT */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description TRANSLATION_INCOMPLETE */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageRevisionRefDto"];
+            };
+        };
+        responses: {
+            /** @description Approves exactly the submitted content. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description REVISION_CONFLICT | TRANSLATION_NOT_SUBMITTED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_requestChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestPageChangesDto"];
+            };
+        };
+        responses: {
+            /** @description Sends a submitted or approved translation back to the editor with a note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description REVISION_CONFLICT | TRANSLATION_NOT_SUBMITTED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminPages_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageRevisionRefDto"];
+            };
+        };
+        responses: {
+            /** @description Makes the approved draft of this locale live. Other locales are untouched. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND | TRANSLATION_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description REVISION_CONFLICT | TRANSLATION_NOT_APPROVED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublicPages_get: {
+        parameters: {
+            query?: {
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPage"];
+                };
+            };
+            /** @description UNKNOWN_LOCALE | VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PAGE_NOT_FOUND (unknown page, or this locale is not published) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

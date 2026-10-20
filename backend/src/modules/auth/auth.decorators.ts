@@ -20,6 +20,10 @@ export const PERMISSIONS = [
   'article:archive',
   'media:read',
   'media:write',
+  'page:read',
+  'page:write',
+  'page:review',
+  'page:publish',
   'user:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

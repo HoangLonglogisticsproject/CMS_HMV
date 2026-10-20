@@ -22,6 +22,9 @@ model Locale {
   articleSlugs            ArticleSlug[]
   categoryTranslations    ArticleCategoryTranslation[]
   mediaTranslations       MediaAssetTranslation[]
+  pageTranslations        PageRevisionTranslation[]
+  pageReviews             PageTranslationReview[]
+  pagePublishedLocales    PagePublishedLocale[]
 
   @@map("locales")
 }
@@ -47,6 +50,9 @@ model User {
   revisions        ArticleRevision[]
   approvals        ArticleTranslationApproval[]
   mediaUploaded    MediaAsset[]
+  pageRevisions    PageRevision[]
+  pageReviews      PageTranslationReview[]
+  pagePublications PagePublishedLocale[]
 
   @@map("users")
 }
@@ -340,7 +346,7 @@ model MediaAssetTranslation {
 }
 
 // ----------------------------------------------------
-// 5. Not yet implemented domains (scaffold, no API yet).
+// 5. Not yet implemented domains (scaffold, no API yet): commodities, products, processing.
 // ponytail: kept from the original scaffold untouched; they still use the SupportedLocale enum and
 // status-on-identity. Redesign each with the Article revision/locale pattern when its slice is built.
 // ----------------------------------------------------
@@ -355,35 +361,6 @@ enum PublicationStatus {
 enum SupportedLocale {
   en
   vi
-}
-
-model Page {
-  id           String            @id @default(uuid())
-  systemKey    String            @unique // e.g., "home", "supply-chain", "about"
-  status       PublicationStatus @default(DRAFT)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  translations PageTranslation[]
-
-  @@map("pages")
-}
-
-model PageTranslation {
-  id             String          @id @default(uuid())
-  pageId         String
-  locale         SupportedLocale
-  title          String
-  slug           String
-  summary        String?
-  sections       Json? // Structured sections for Blue Ocean landing & narrative
-  seoTitle       String?
-  seoDescription String?
-  isStale        Boolean         @default(false)
-  page           Page            @relation(fields: [pageId], references: [id], onDelete: Cascade)
-
-  @@unique([pageId, locale])
-  @@unique([locale, slug])
-  @@map("page_translations")
 }
 
 enum CapabilityTier {
@@ -483,4 +460,97 @@ model ProcessingCapabilityTranslation {
 
   @@unique([capabilityId, locale])
   @@map("processing_capability_translations")
+}
+
+// ----------------------------------------------------
+// 6. Website pages (ADR-008): fixed pages with typed, localized content
+// ----------------------------------------------------
+/// A website page rendered from the CMS (e.g. "about"). Rows come from migrations: editors edit pages, they do not create them.
+/// The draft is the highest revision. Each locale is reviewed and published on its own (PagePublishedLocale).
+model Page {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  key       String   @unique // stable identifier used by the website and the public API
+  createdAt DateTime @default(now())
+
+  revisions        PageRevision[]
+  reviews          PageTranslationReview[]
+  publishedLocales PagePublishedLocale[]
+
+  @@map("pages")
+}
+
+/// Immutable snapshot. Saving inserts revision N+1, so published content is never overwritten.
+model PageRevision {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  pageId      String   @db.Uuid
+  number      Int // 1-based per page; also the optimistic-concurrency token
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+
+  page         Page                      @relation(fields: [pageId], references: [id])
+  createdBy    User                      @relation(fields: [createdById], references: [id])
+  translations PageRevisionTranslation[]
+  publishedAs  PagePublishedLocale[]
+
+  @@unique([pageId, number])
+  @@map("page_revisions")
+}
+
+model PageRevisionTranslation {
+  revisionId     String  @db.Uuid
+  locale         String
+  content        Json // shape depends on the page key (src/modules/pages/page-content.dto.ts), validated on save
+  contentVersion Int     @default(1)
+  seoTitle       String?
+  seoDescription String?
+  contentHash    String // SHA-256 of content + SEO fields; reviews and publications bind to it
+
+  revision  PageRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  localeRef Locale       @relation(fields: [locale], references: [code])
+
+  @@id([revisionId, locale])
+  @@map("page_revision_translations")
+}
+
+enum PageReviewStatus {
+  IN_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+/// Latest review step for one locale. It applies only while contentHash matches the draft: any edit returns it to draft.
+model PageTranslationReview {
+  pageId      String           @db.Uuid
+  locale      String
+  contentHash String
+  status      PageReviewStatus
+  note        String? // why changes were requested
+  actorId     String           @db.Uuid
+  updatedAt   DateTime         @default(now())
+
+  page      Page   @relation(fields: [pageId], references: [id])
+  localeRef Locale @relation(fields: [locale], references: [code])
+  actor     User   @relation(fields: [actorId], references: [id])
+
+  @@id([pageId, locale])
+  @@map("page_translation_reviews")
+}
+
+/// Live locales and the revision each one is served from.
+model PagePublishedLocale {
+  pageId           String   @db.Uuid
+  locale           String
+  revisionId       String   @db.Uuid
+  firstPublishedAt DateTime @default(now())
+  publishedAt      DateTime @default(now()) // latest publication of this locale
+  publishedById    String   @db.Uuid
+
+  page        Page         @relation(fields: [pageId], references: [id])
+  localeRef   Locale       @relation(fields: [locale], references: [code])
+  revision    PageRevision @relation(fields: [revisionId], references: [id])
+  publishedBy User         @relation(fields: [publishedById], references: [id])
+
+  @@id([pageId, locale])
+  @@index([revisionId])
+  @@map("page_published_locales")
 }
