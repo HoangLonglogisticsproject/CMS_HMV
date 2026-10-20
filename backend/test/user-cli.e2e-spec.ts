@@ -54,7 +54,12 @@ describe('User CLIs (PostgreSQL)', () => {
       },
     );
     expect(r.code).toBe(0);
-    expect(r.out).toContain('Target database: localhost:5442/hmv_cms_test');
+    // The exact database the CLI is about to change: the test database, wherever it runs (dev :5442, CI :5432).
+    const target = new URL(process.env.DATABASE_URL!);
+    expect(target.pathname).toBe('/hmv_cms_test');
+    expect(r.out).toContain(
+      `Target database: ${target.hostname}:${target.port}${target.pathname}`,
+    );
     expect(r.out).not.toContain(NEW_PASSWORD);
     const user = await t.prisma.user.findUniqueOrThrow({
       where: { email: 'new.editor@hmv.test' },
