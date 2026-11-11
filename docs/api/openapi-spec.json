@@ -3104,6 +3104,723 @@
           "Admin · Users"
         ]
       }
+    },
+    "/api/v1/integrations/trade-inquiries": {
+      "post": {
+        "operationId": "TradeInquiryIngest_ingest",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "8-64 letters, digits or hyphens",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-HMV-Signature",
+            "in": "header",
+            "description": "hex HMAC-SHA256(secret, \"<timestamp>.<idempotencyKey>\")",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-HMV-Timestamp",
+            "in": "header",
+            "description": "Unix time in seconds (±5 minutes)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestTradeInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Known idempotency key: the existing inquiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestTradeInquiryResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New inquiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestTradeInquiryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "SIGNATURE_INVALID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INTEGRATION_DISABLED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries": {
+      "get": {
+        "operationId": "AdminTradeInquiries_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/TradeInquiryStatus"
+            }
+          },
+          {
+            "name": "goal",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sourcing",
+                "logistics",
+                "customs"
+              ]
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "Only inquiries with nobody assigned.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Received on or after (ISO date or date-time).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Received before the end of this day (ISO date) or this instant (date-time).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "utmSource",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Reference, company, email, contact name, product or destination (case-insensitive).",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries/stats": {
+      "get": {
+        "operationId": "AdminTradeInquiries_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryStatsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries/assignees": {
+      "get": {
+        "operationId": "AdminTradeInquiries_assignees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryAssigneeListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries/{id}": {
+      "get": {
+        "operationId": "AdminTradeInquiries_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "INQUIRY_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminTradeInquiries_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTradeInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "INQUIRY_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ASSIGNEE_INVALID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries/{id}/notes": {
+      "post": {
+        "operationId": "AdminTradeInquiries_addNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTradeInquiryNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryNoteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "INQUIRY_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
+    },
+    "/api/v1/admin/trade-inquiries/{id}/resend-notification": {
+      "post": {
+        "operationId": "AdminTradeInquiries_resendNotification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeInquiryDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "INQUIRY_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "tags": [
+          "Admin · Trade inquiries"
+        ]
+      }
     }
   },
   "info": {
@@ -3162,7 +3879,9 @@
           "page:write",
           "page:review",
           "page:publish",
-          "user:manage"
+          "user:manage",
+          "inquiry:read",
+          "inquiry:write"
         ]
       },
       "SessionUser": {
@@ -3256,7 +3975,11 @@
           "USER_NOT_FOUND",
           "EMAIL_TAKEN",
           "UNKNOWN_ROLE",
-          "LAST_ADMIN"
+          "LAST_ADMIN",
+          "INTEGRATION_DISABLED",
+          "SIGNATURE_INVALID",
+          "INQUIRY_NOT_FOUND",
+          "ASSIGNEE_INVALID"
         ]
       },
       "ErrorResponse": {
@@ -5362,6 +6085,647 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "InquiryVolumeDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "maxLength": 20,
+            "pattern": "^([0-9][0-9.,\\s]*)?$"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32
+          }
+        }
+      },
+      "InquiryContactDto": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 150
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[+0-9()\\s.-]*$"
+          }
+        },
+        "required": [
+          "company",
+          "email"
+        ]
+      },
+      "InquiryUtmDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "medium": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "campaign": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "InquirySourceDto": {
+        "type": "object",
+        "properties": {
+          "landingPage": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "referrer": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "utm": {
+            "$ref": "#/components/schemas/InquiryUtmDto"
+          }
+        }
+      },
+      "IngestTradeInquiryDto": {
+        "type": "object",
+        "properties": {
+          "requirements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Controlled requirement key → value (a choice requirement's option id). Checked against the contract."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "vi"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "enum": [
+              "sourcing",
+              "logistics",
+              "customs"
+            ]
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Website product id; required for sourcing.",
+            "maxLength": 64
+          },
+          "goods": {
+            "type": "string",
+            "description": "Cargo or goods description; required for logistics and customs.",
+            "maxLength": 200
+          },
+          "origin": {
+            "type": "string",
+            "description": "Sourcing: an origin id (\"vietnam\"); otherwise free text.",
+            "maxLength": 120
+          },
+          "destination": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "volume": {
+            "$ref": "#/components/schemas/InquiryVolumeDto"
+          },
+          "application": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "transport": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "contact": {
+            "$ref": "#/components/schemas/InquiryContactDto"
+          },
+          "source": {
+            "$ref": "#/components/schemas/InquirySourceDto"
+          },
+          "consentAt": {
+            "type": "string",
+            "description": "When the buyer ticked the contact-consent box (the submission time)."
+          }
+        },
+        "required": [
+          "requirements",
+          "locale",
+          "goal",
+          "contact",
+          "consentAt"
+        ]
+      },
+      "IngestTradeInquiryResponse": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "HMV-YYYY-XXXXXX: the reference the website shows the buyer."
+          },
+          "duplicate": {
+            "type": "boolean",
+            "description": "True when this idempotency key was already received: the existing inquiry is returned, nothing is created."
+          }
+        },
+        "required": [
+          "reference",
+          "duplicate"
+        ]
+      },
+      "TradeInquiryStatus": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "CONTACTED",
+          "QUALIFIED",
+          "QUOTED",
+          "WON",
+          "LOST"
+        ]
+      },
+      "InquiryNotificationStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "SENT",
+          "FAILED",
+          "SKIPPED"
+        ]
+      },
+      "TradeInquirySummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TradeInquiryStatus"
+              }
+            ]
+          },
+          "notificationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InquiryNotificationStatus"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true
+          },
+          "productName": {
+            "type": "string",
+            "nullable": true
+          },
+          "goods": {
+            "type": "string",
+            "nullable": true
+          },
+          "destination": {
+            "type": "string",
+            "nullable": true
+          },
+          "volumeAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "volumeUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "company": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "utmSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "referrerOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedTo": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
+          "lastActivityAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "notificationStatus",
+          "id",
+          "reference",
+          "createdAt",
+          "locale",
+          "goal",
+          "productId",
+          "productName",
+          "goods",
+          "destination",
+          "volumeAmount",
+          "volumeUnit",
+          "company",
+          "contactName",
+          "utmSource",
+          "referrerOrigin",
+          "assignedTo",
+          "lastActivityAt"
+        ]
+      },
+      "TradeInquiryListResponse": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeInquirySummary"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "TradeInquiryStatsResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "new": {
+            "type": "number"
+          },
+          "contacted": {
+            "type": "number"
+          },
+          "qualified": {
+            "type": "number"
+          },
+          "quoted": {
+            "type": "number"
+          },
+          "won": {
+            "type": "number"
+          },
+          "lost": {
+            "type": "number"
+          },
+          "today": {
+            "type": "number",
+            "description": "Received since 00:00 Vietnam time (UTC+7)."
+          },
+          "last7Days": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "new",
+          "contacted",
+          "qualified",
+          "quoted",
+          "won",
+          "lost",
+          "today",
+          "last7Days"
+        ]
+      },
+      "InquiryAssigneeListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRef"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "InquiryRequirement": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "value"
+        ]
+      },
+      "TradeInquiryNoteResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserRef"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "createdAt",
+          "createdBy"
+        ]
+      },
+      "TradeInquiryDetailResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TradeInquiryStatus"
+              }
+            ]
+          },
+          "notificationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InquiryNotificationStatus"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true
+          },
+          "productName": {
+            "type": "string",
+            "nullable": true
+          },
+          "goods": {
+            "type": "string",
+            "nullable": true
+          },
+          "destination": {
+            "type": "string",
+            "nullable": true
+          },
+          "volumeAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "volumeUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "company": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "utmSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "referrerOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedTo": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
+          "lastActivityAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "origin": {
+            "type": "string",
+            "nullable": true
+          },
+          "application": {
+            "type": "string",
+            "nullable": true
+          },
+          "transport": {
+            "type": "string",
+            "nullable": true
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryRequirement"
+            }
+          },
+          "buyerNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "landingPage": {
+            "type": "string",
+            "nullable": true
+          },
+          "utmMedium": {
+            "type": "string",
+            "nullable": true
+          },
+          "utmCampaign": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactConsentAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notificationAttempts": {
+            "type": "number"
+          },
+          "notificationLastAttemptAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeInquiryNoteResponse"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "notificationStatus",
+          "id",
+          "reference",
+          "createdAt",
+          "locale",
+          "goal",
+          "productId",
+          "productName",
+          "goods",
+          "destination",
+          "volumeAmount",
+          "volumeUnit",
+          "company",
+          "contactName",
+          "utmSource",
+          "referrerOrigin",
+          "assignedTo",
+          "lastActivityAt",
+          "origin",
+          "application",
+          "transport",
+          "requirements",
+          "buyerNotes",
+          "email",
+          "phone",
+          "landingPage",
+          "utmMedium",
+          "utmCampaign",
+          "contactConsentAt",
+          "updatedAt",
+          "notificationAttempts",
+          "notificationLastAttemptAt",
+          "notes"
+        ]
+      },
+      "UpdateTradeInquiryDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TradeInquiryStatus"
+              }
+            ]
+          },
+          "assignedToId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateTradeInquiryNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "body"
         ]
       }
     }

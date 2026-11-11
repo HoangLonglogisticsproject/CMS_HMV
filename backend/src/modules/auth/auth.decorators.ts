@@ -25,6 +25,8 @@ export const PERMISSIONS = [
   'page:review',
   'page:publish',
   'user:manage',
+  'inquiry:read',
+  'inquiry:write',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

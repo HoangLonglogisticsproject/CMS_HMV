@@ -10,7 +10,7 @@ export async function resetTestData(prisma: PrismaClient) {
       `Refusing to wipe "${database}": the database name must end with "_test"`,
     );
   }
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE audit_logs, sessions, user_roles, article_revision_media, article_slugs,
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE trade_inquiry_notes, trade_inquiries, audit_logs, sessions, user_roles, article_revision_media, article_slugs,
     article_published_locales, article_translation_approvals, article_revision_translations, article_revisions, articles,
     page_published_locales, page_translation_reviews, page_revision_translations, page_revisions,
     media_asset_translations, media_assets, users CASCADE`);

@@ -38,6 +38,9 @@ export default defineConfig({
         STORAGE_DRIVER: "local",
         LOCAL_STORAGE_DIR: E2E.mediaDir,
         MEDIA_PUBLIC_BASE_URL: `${E2E.api}/media-files`,
+        TRADE_INQUIRY_INGEST_ENABLED: "true",
+        TRADE_INQUIRY_INGEST_SECRET: E2E.ingestSecret,
+        INQUIRY_NOTIFY_EMAIL_ENABLED: "false",
       },
     },
     {

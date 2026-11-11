@@ -22,6 +22,14 @@ export const queryKeys = {
     roles: ["users", "roles"] as const,
     events: ["users", "security-events"] as const,
   },
+  inquiries: {
+    all: ["inquiries"] as const,
+    lists: ["inquiries", "list"] as const,
+    list: (params: Record<string, unknown>) => ["inquiries", "list", params] as const,
+    stats: ["inquiries", "stats"] as const,
+    detail: (id: string) => ["inquiries", "detail", id] as const,
+    assignees: ["inquiries", "assignees"] as const,
+  },
   media: {
     all: ["media"] as const,
     lists: ["media", "list"] as const,

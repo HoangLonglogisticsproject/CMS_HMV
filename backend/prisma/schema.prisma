@@ -42,17 +42,19 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  roles            UserRole[]
-  sessions         Session[]
-  auditLogs        AuditLog[]
-  articlesCreated  Article[]                    @relation("ArticleCreatedBy")
-  articlesArchived Article[]                    @relation("ArticleArchivedBy")
-  revisions        ArticleRevision[]
-  approvals        ArticleTranslationApproval[]
-  mediaUploaded    MediaAsset[]
-  pageRevisions    PageRevision[]
-  pageReviews      PageTranslationReview[]
-  pagePublications PagePublishedLocale[]
+  roles             UserRole[]
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  articlesCreated   Article[]                    @relation("ArticleCreatedBy")
+  articlesArchived  Article[]                    @relation("ArticleArchivedBy")
+  revisions         ArticleRevision[]
+  approvals         ArticleTranslationApproval[]
+  mediaUploaded     MediaAsset[]
+  pageRevisions     PageRevision[]
+  pageReviews       PageTranslationReview[]
+  pagePublications  PagePublishedLocale[]
+  inquiriesAssigned TradeInquiry[]               @relation("TradeInquiryAssignedTo")
+  inquiryNotes      TradeInquiryNote[]
 
   @@map("users")
 }
@@ -553,4 +555,100 @@ model PagePublishedLocale {
   @@id([pageId, locale])
   @@index([revisionId])
   @@map("page_published_locales")
+}
+
+// ----------------------------------------------------
+// 7. Sales: trade inquiries from the website's HMV Trade Desk (docs/sales/TRADE_INQUIRIES.md)
+// ----------------------------------------------------
+enum TradeInquiryStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  QUOTED
+  WON
+  LOST
+}
+
+/// Email notification to the commercial team. SKIPPED: notification email is disabled.
+enum InquiryNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// A buyer's trade inquiry, received from the website (POST /integrations/trade-inquiries). The commercial brief is a
+/// snapshot as submitted: the public product catalogue and the CMS commodities are not one source of truth yet, so there
+/// is no relation to Commodity / ProductVariant. The brief is never edited; sales work is status, assignment and notes.
+model TradeInquiry {
+  id             String             @id @default(uuid(7)) @db.Uuid
+  reference      String             @unique // HMV-YYYY-XXXXXX, shown to the buyer
+  idempotencyKey String             @unique // from the website: a resubmission returns the same inquiry
+  status         TradeInquiryStatus @default(NEW)
+  locale         String // "en" | "vi"
+  goal           String // "sourcing" | "logistics" | "customs"
+
+  // Commercial requirement snapshot
+  productId    String? // website product id, e.g. "dried-cassava-chips"
+  productName  String?
+  goods        String?
+  origin       String?
+  destination  String?
+  volumeAmount String?
+  volumeUnit   String?
+  application  String?
+  transport    String?
+  requirements Json // [{ key, label, value }] from the controlled Trade Desk requirement list
+  buyerNotes   String?
+
+  // Buyer contact
+  company     String
+  contactName String?
+  email       String // stored lower-cased
+  phone       String?
+
+  // Source attribution (no query strings, no referrer paths)
+  landingPage    String?
+  referrerOrigin String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+
+  contactConsentAt DateTime
+
+  // Sales operations
+  assignedToId   String?  @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastActivityAt DateTime @default(now())
+
+  notificationStatus        InquiryNotificationStatus @default(PENDING)
+  notificationAttempts      Int                       @default(0)
+  notificationLastAttemptAt DateTime?
+
+  assignedTo User?              @relation("TradeInquiryAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  notes      TradeInquiryNote[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([assignedToId, status])
+  @@index([email])
+  @@index([productId, createdAt])
+  @@index([utmSource, createdAt])
+  @@map("trade_inquiries")
+}
+
+/// Internal sales note on an inquiry. Never shown to the buyer; never deleted.
+model TradeInquiryNote {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  inquiryId   String   @db.Uuid
+  body        String
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+
+  inquiry   TradeInquiry @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  createdBy User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([inquiryId, createdAt])
+  @@map("trade_inquiry_notes")
 }

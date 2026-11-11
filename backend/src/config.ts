@@ -13,6 +13,61 @@ function trustProxy(value?: string): boolean | number | string {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
+/** Minimum length of the website ↔ CMS shared secret (HMAC key): 32 characters of random data or more. */
+export const INGEST_SECRET_MIN_LENGTH = 32;
+
+/**
+ * Trade inquiries (docs/sales/TRADE_INQUIRIES.md): the website ingestion endpoint and the email notification.
+ * Both are off unless enabled; enabled with missing or weak settings, the API refuses to start rather than run open.
+ */
+function tradeInquiryConfig(env: NodeJS.ProcessEnv, isProduction: boolean) {
+  const ingestEnabled = env.TRADE_INQUIRY_INGEST_ENABLED === 'true';
+  const ingestSecret = env.TRADE_INQUIRY_INGEST_SECRET ?? '';
+  if (ingestEnabled && ingestSecret.length < INGEST_SECRET_MIN_LENGTH)
+    throw new Error(
+      `TRADE_INQUIRY_INGEST_SECRET must be at least ${INGEST_SECRET_MIN_LENGTH} characters when TRADE_INQUIRY_INGEST_ENABLED=true`,
+    );
+
+  const notifyEnabled = env.INQUIRY_NOTIFY_EMAIL_ENABLED === 'true';
+  const cmsPublicUrl = (env.CMS_PUBLIC_URL ?? 'http://localhost:3000').replace(
+    /\/+$/,
+    '',
+  );
+  const to = list(env.INQUIRY_NOTIFY_TO);
+  if (notifyEnabled) {
+    const missing = [
+      ['INQUIRY_NOTIFY_TO', to.length],
+      ['INQUIRY_NOTIFY_FROM', env.INQUIRY_NOTIFY_FROM],
+      ['SMTP_HOST', env.SMTP_HOST],
+      ['CMS_PUBLIC_URL', env.CMS_PUBLIC_URL],
+    ].filter(([, value]) => !value);
+    if (missing.length)
+      throw new Error(
+        `${missing.map(([name]) => name).join(', ')} required when INQUIRY_NOTIFY_EMAIL_ENABLED=true`,
+      );
+  }
+  if (isProduction && notifyEnabled && !cmsPublicUrl.startsWith('https://'))
+    throw new Error('CMS_PUBLIC_URL must be an https URL in production');
+
+  return {
+    ingestEnabled,
+    ingestSecret,
+    cmsPublicUrl,
+    notify: {
+      enabled: notifyEnabled,
+      to,
+      from: env.INQUIRY_NOTIFY_FROM ?? '',
+      smtp: {
+        host: env.SMTP_HOST ?? '',
+        port: Number(env.SMTP_PORT ?? 587),
+        secure: env.SMTP_SECURE === 'true',
+        user: env.SMTP_USER ?? '',
+        pass: env.SMTP_PASS ?? '',
+      },
+    },
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const isProduction = env.NODE_ENV === 'production';
   const port = Number(env.PORT ?? 4000);
@@ -46,6 +101,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     throw new Error(`Unknown STORAGE_DRIVER "${driver}"`);
 
   return {
+    tradeInquiries: tradeInquiryConfig(env, isProduction),
     isProduction,
     port,
     corsOrigins,

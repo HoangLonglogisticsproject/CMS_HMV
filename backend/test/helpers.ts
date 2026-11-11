@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { readFileSync } from 'node:fs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -15,10 +15,13 @@ let userSeq = 0;
 export type TestApp = Awaited<ReturnType<typeof setupApp>>;
 export type Session = Awaited<ReturnType<TestApp['signIn']>>;
 
-export async function setupApp() {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+/** `configure` can override providers, e.g. replace the inquiry email notifier with a recorder. */
+export async function setupApp(
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
+) {
+  const moduleRef = await configure(
+    Test.createTestingModule({ imports: [AppModule] }),
+  ).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     bodyParser: false,
     logger: ['error'],

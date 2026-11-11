@@ -13,6 +13,13 @@ import {
   toFormValues,
 } from "@/modules/content/articles/utils/article-form";
 import { getArticlePublishReadiness } from "@/modules/content/articles/utils/publish-readiness";
+import {
+  buyerMailto,
+  inquirySource,
+  inquirySubject,
+  inquiryVolume,
+  whatsAppLink,
+} from "@/modules/sales/utils/inquiry-format";
 
 const doc = (text: string, extra: object[] = []) => ({
   type: "doc",
@@ -223,5 +230,45 @@ test.describe("CSRF token ownership (cross-tab identity)", () => {
     for (const code of ["CSRF_TOKEN_INVALID", "PERMISSION_DENIED", "ORIGIN_NOT_ALLOWED"]) await answer(code).catch(() => undefined);
     off();
     expect(signals).toBe(2); // not for ORIGIN_NOT_ALLOWED: re-reading the session cannot fix that
+  });
+});
+
+test.describe("sales inbox formatting", () => {
+  const brief = {
+    productName: null,
+    goods: null,
+    goal: "customs",
+    volumeAmount: null,
+    volumeUnit: null,
+    utmSource: null,
+    referrerOrigin: null,
+  };
+
+  test("subject: product, else goods, else the goal", () => {
+    expect(inquirySubject({ ...brief, productName: "Dried cassava chips", goods: "x" })).toBe("Dried cassava chips");
+    expect(inquirySubject({ ...brief, goods: "Chemical samples" })).toBe("Chemical samples");
+    expect(inquirySubject(brief)).toBe("Thủ tục hải quan");
+  });
+
+  test("volume and source", () => {
+    expect(inquiryVolume(brief)).toBeNull();
+    expect(inquiryVolume({ ...brief, volumeAmount: "5000", volumeUnit: "MT / month" })).toBe("5000 MT / month");
+    expect(inquirySource({ ...brief, utmSource: "linkedin", referrerOrigin: "https://www.google.com" })).toBe("utm: linkedin");
+    expect(inquirySource({ ...brief, referrerOrigin: "https://www.google.com" })).toBe("www.google.com");
+    expect(inquirySource(brief)).toBe("Truy cập trực tiếp");
+  });
+
+  test("WhatsApp link only for an international number", () => {
+    expect(whatsAppLink("+84 909 000 000")).toBe("https://wa.me/84909000000");
+    expect(whatsAppLink("0084 (909) 000-000")).toBe("https://wa.me/84909000000");
+    expect(whatsAppLink("0909 000 000")).toBeNull(); // national form: no country code to dial
+    expect(whatsAppLink("+84 9")).toBeNull();
+    expect(whatsAppLink(null)).toBeNull();
+  });
+
+  test("mailto names the reference and encodes the subject", () => {
+    expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips")).toBe(
+      "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
+    );
   });
 });
