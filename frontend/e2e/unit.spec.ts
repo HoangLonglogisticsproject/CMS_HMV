@@ -278,6 +278,15 @@ test.describe("sales inbox formatting", () => {
     expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Nuts & seeds?#")).toBe(
       "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Nuts%20%26%20seeds%3F%23",
     );
+    // A valid address with # and ? in its local part: encoded, so the URI keeps one recipient and its subject.
+    const href = buyerMailto("buyer#eu?team@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips");
+    expect(href).toBe(
+      "mailto:buyer%23eu%3Fteam@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
+    );
+    const url = new URL(href);
+    expect(url.hash).toBe("");
+    expect(decodeURIComponent(url.pathname)).toBe("buyer#eu?team@example.com");
+    expect(url.searchParams.get("subject")).toBe("HMV Global — HMV-2026-7KQ4XM — Dried cassava chips");
   });
 });
 

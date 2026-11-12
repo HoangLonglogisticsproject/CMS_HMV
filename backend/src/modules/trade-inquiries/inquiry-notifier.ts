@@ -115,15 +115,16 @@ export function buildInquiryEmail(
   };
 }
 
-type SmtpConfig = AppConfig['tradeInquiries']['notify']['smtp'];
-
 /**
- * The SMTP transport settings. The connection is always encrypted, because the email carries buyer contact details:
- * implicit TLS when `secure` (port 465), otherwise STARTTLS is required (`requireTLS`), so a server that does not
- * offer it makes the attempt fail rather than send in clear text. Connection, greeting and socket timeouts stay
- * inside the attempt budget.
+ * SMTP via nodemailer. The connection is always encrypted, because the email carries buyer contact details: implicit
+ * TLS when `secure` (port 465), otherwise STARTTLS is required (`requireTLS`), so a server that does not offer it makes
+ * the attempt fail rather than send in clear text. Connection, greeting and socket timeouts stay inside the attempt
+ * budget.
  */
-export function smtpTransportOptions(smtp: SmtpConfig) {
+export function smtpNotifier(
+  config: AppConfig['tradeInquiries']['notify'],
+): InquiryNotifier {
+  const smtp = config.smtp;
   const common = {
     host: smtp.host,
     port: smtp.port,
@@ -132,15 +133,9 @@ export function smtpTransportOptions(smtp: SmtpConfig) {
     greetingTimeout: 2_000,
     socketTimeout: NOTIFY_TIMEOUT_MS,
   };
-  if (smtp.secure) return { ...common, secure: true };
-  return { ...common, requireTLS: true };
-}
-
-/** SMTP via nodemailer, encrypted (smtpTransportOptions). */
-export function smtpNotifier(
-  config: AppConfig['tradeInquiries']['notify'],
-): InquiryNotifier {
-  const transport = createTransport(smtpTransportOptions(config.smtp));
+  const transport = smtp.secure
+    ? createTransport({ ...common, secure: true })
+    : createTransport({ ...common, requireTLS: true });
   return {
     enabled: true,
     async send(message, signal) {

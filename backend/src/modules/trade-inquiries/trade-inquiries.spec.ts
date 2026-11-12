@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { createTransport } from 'nodemailer';
 import { loadConfig, trimTrailingSlashes } from '../../config';
 import { AppError } from '../../common/errors';
 import { blankToNull, buildBrief } from './inquiry-brief';
@@ -9,7 +10,7 @@ import {
   type InquiryNotifier,
   buildInquiryEmail,
   sendWithin,
-  smtpTransportOptions,
+  smtpNotifier,
 } from './inquiry-notifier';
 import { REFERENCE, createReference } from './inquiry-reference';
 import {
@@ -23,6 +24,11 @@ import {
   vietnamBound,
 } from './trade-inquiries.service';
 import { IngestTradeInquiryDto, isFilterDate } from './trade-inquiry.dto';
+
+// The SMTP transport is only inspected here, never opened.
+vi.mock('nodemailer', () => ({
+  createTransport: vi.fn(() => ({ sendMail: vi.fn() })),
+}));
 
 // Shared with the website (HMV_landingpage src/next/inquiry/service.test.js and docs/inbound/TRADE_DESK_DELIVERY.md):
 // both repositories must produce this exact signature over these exact body bytes, or the integration has drifted.
@@ -441,21 +447,36 @@ describe('SMTP transport', () => {
     user: 'u',
     pass: 'p',
   };
+  /** The options smtpNotifier gives nodemailer's createTransport for these SMTP settings. */
+  const transportOptions = (settings: typeof smtp) => {
+    const create = vi.mocked(createTransport);
+    create.mockClear();
+    smtpNotifier({
+      enabled: true,
+      to: ['sales@hmv.test'],
+      from: 'cms@hmv.test',
+      smtp: settings,
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+    return create.mock.calls[0][0] as Record<string, unknown>;
+  };
+
   it('is always encrypted: implicit TLS when secure, STARTTLS required otherwise', () => {
-    const implicit = smtpTransportOptions({ ...smtp, port: 465, secure: true });
+    const implicit = transportOptions({ ...smtp, port: 465, secure: true });
     expect(implicit).toMatchObject({ secure: true, port: 465 });
     expect(implicit).not.toHaveProperty('requireTLS');
 
-    const starttls = smtpTransportOptions(smtp);
+    const starttls = transportOptions(smtp);
     expect(starttls).toMatchObject({ requireTLS: true, port: 587 });
     // Nothing that could turn TLS off or leave it optional: no secure:false, ignoreTLS or relaxed certificates.
+    for (const options of [implicit, starttls]) {
+      expect(options.secure).not.toBe(false);
+      expect(options).not.toHaveProperty('ignoreTLS');
+      expect(options).not.toHaveProperty('tls');
+    }
     expect(starttls).not.toHaveProperty('secure');
-    expect(starttls).not.toHaveProperty('ignoreTLS');
-    expect(starttls).not.toHaveProperty('tls');
-    expect(implicit).not.toHaveProperty('ignoreTLS');
-    expect(implicit).not.toHaveProperty('tls');
 
-    expect(smtpTransportOptions({ ...smtp, user: '' }).auth).toBeUndefined();
+    expect(transportOptions({ ...smtp, user: '' }).auth).toBeUndefined();
   });
 });
 

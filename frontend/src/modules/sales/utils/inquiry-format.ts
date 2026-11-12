@@ -129,9 +129,13 @@ export const settledPage = (page: number, pageCount: number, settled: boolean) =
 /** The note box after a save: cleared only if it still holds the text that was saved, never newer typing. */
 export const noteAfterSave = (current: string, saved: string) => (current === saved ? "" : current);
 
-/** mailto: with a subject naming the reference; the body is left to the salesperson. */
+/**
+ * mailto: with a subject naming the reference; the body is left to the salesperson. The address is percent-encoded
+ * around its @, so a character such as # or ? in it can never start the fragment or the query.
+ */
 export const buyerMailto = (email: string, reference: string, subject: string) => {
+  const recipient = email.split("@").map(encodeURIComponent).join("@");
   const mailSubject = `HMV Global — ${reference} — ${subject}`;
   const encodedSubject = encodeURIComponent(mailSubject);
-  return `mailto:${email}?subject=${encodedSubject}`;
+  return `mailto:${recipient}?subject=${encodedSubject}`;
 };
