@@ -13,6 +13,16 @@ import {
   toFormValues,
 } from "@/modules/content/articles/utils/article-form";
 import { getArticlePublishReadiness } from "@/modules/content/articles/utils/publish-readiness";
+import {
+  buyerMailto,
+  formatVietnamDateTime,
+  inquirySource,
+  inquiryVolume,
+  noteAfterSave,
+  settledPage,
+  splitRequirements,
+  whatsAppLink,
+} from "@/modules/sales/utils/inquiry-format";
 
 const doc = (text: string, extra: object[] = []) => ({
   type: "doc",
@@ -223,5 +233,83 @@ test.describe("CSRF token ownership (cross-tab identity)", () => {
     for (const code of ["CSRF_TOKEN_INVALID", "PERMISSION_DENIED", "ORIGIN_NOT_ALLOWED"]) await answer(code).catch(() => undefined);
     off();
     expect(signals).toBe(2); // not for ORIGIN_NOT_ALLOWED: re-reading the session cannot fix that
+  });
+});
+
+test.describe("sales inbox formatting", () => {
+  const brief = {
+    volumeAmount: null,
+    volumeUnit: null,
+    utmSource: null,
+    referrerOrigin: null,
+  };
+
+  test("requirements: product specification apart from supply execution, each in stored order", () => {
+    const r = (key: string) => ({ key, label: key, value: "x" });
+    const { specification, execution } = splitRequirements(
+      ["starch", "moisture", "loading", "incoterm", "destinationPort", "deliveryWindow", "spec-kernel-grade", "spec-packaging"].map(r),
+    );
+    expect(specification.map((x) => x.key)).toEqual(["starch", "moisture", "spec-kernel-grade"]);
+    expect(execution.map((x) => x.key)).toEqual(["loading", "incoterm", "destinationPort", "deliveryWindow", "spec-packaging"]);
+    expect(splitRequirements([])).toEqual({ specification: [], execution: [] });
+  });
+
+  test("volume and source", () => {
+    expect(inquiryVolume(brief)).toBeNull();
+    expect(inquiryVolume({ ...brief, volumeAmount: "5000", volumeUnit: "MT / month" })).toBe("5000 MT / month");
+    expect(inquirySource({ ...brief, utmSource: "linkedin", referrerOrigin: "https://www.google.com" })).toBe("utm: linkedin");
+    expect(inquirySource({ ...brief, referrerOrigin: "https://www.google.com" })).toBe("www.google.com");
+    expect(inquirySource(brief)).toBe("Truy cập trực tiếp");
+  });
+
+  test("WhatsApp link only for an international number", () => {
+    expect(whatsAppLink("+84 909 000 000")).toBe("https://wa.me/84909000000");
+    expect(whatsAppLink("0084 (909) 000-000")).toBe("https://wa.me/84909000000");
+    expect(whatsAppLink("0909 000 000")).toBeNull(); // national form: no country code to dial
+    expect(whatsAppLink("+84 9")).toBeNull();
+    expect(whatsAppLink(null)).toBeNull();
+  });
+
+  test("mailto names the reference and encodes the subject", () => {
+    expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips")).toBe(
+      "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
+    );
+    // Reserved characters in the product name stay inside the subject: they never start another query parameter.
+    expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Nuts & seeds?#")).toBe(
+      "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Nuts%20%26%20seeds%3F%23",
+    );
+    // A valid address with # and ? in its local part: encoded, so the URI keeps one recipient and its subject.
+    const href = buyerMailto("buyer#eu?team@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips");
+    expect(href).toBe(
+      "mailto:buyer%23eu%3Fteam@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
+    );
+    const url = new URL(href);
+    expect(url.hash).toBe("");
+    expect(decodeURIComponent(url.pathname)).toBe("buyer#eu?team@example.com");
+    expect(url.searchParams.get("subject")).toBe("HMV Global — HMV-2026-7KQ4XM — Dried cassava chips");
+  });
+});
+
+test.describe("sales inbox state", () => {
+  test("page: back to the last page only on a settled response that has fewer pages", () => {
+    expect(settledPage(2, 1, true)).toBe(1); // page 2, results shrank to one page
+    expect(settledPage(5, 3, true)).toBe(3);
+    expect(settledPage(2, 1, false)).toBe(2); // placeholder data during a filter change: unchanged
+    expect(settledPage(2, 2, true)).toBe(2);
+    expect(settledPage(1, 1, true)).toBe(1);
+  });
+
+  test("note box: cleared after a save only if it still holds the saved text", () => {
+    expect(noteAfterSave("Called the buyer", "Called the buyer")).toBe("");
+    expect(noteAfterSave("Called the buyer. Also: samples", "Called the buyer")).toBe("Called the buyer. Also: samples");
+    expect(noteAfterSave("", "Called the buyer")).toBe("");
+  });
+
+  test("timestamps in Vietnam time whatever the browser zone", () => {
+    // 17:00 UTC is 00:00 the next day in Vietnam.
+    const shown = formatVietnamDateTime("2026-11-11T17:00:00Z");
+    expect(shown).toContain("00:00");
+    expect(shown).toContain("12/11");
+    expect(formatVietnamDateTime(null)).toBe("—");
   });
 });

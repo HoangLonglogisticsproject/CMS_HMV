@@ -22,6 +22,8 @@ export function configureApp(app: NestExpressApplication) {
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.setGlobalPrefix('api/v1');
+  // With the app's `rawBody: true` (main.ts, test/helpers.ts), req.rawBody keeps the exact bytes received: the trade
+  // inquiry ingestion signature is computed over them.
   app.useBodyParser('json', { limit: '1mb', reviver: rejectNul });
   app.useGlobalPipes(
     new ValidationPipe({

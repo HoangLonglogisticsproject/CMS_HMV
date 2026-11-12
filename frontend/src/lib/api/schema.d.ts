@@ -565,6 +565,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/trade-inquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TradeInquiryIngest_ingest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminTradeInquiries_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminTradeInquiries_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminTradeInquiries_assignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminTradeInquiries_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AdminTradeInquiries_update"];
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminTradeInquiries_addNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/trade-inquiries/{id}/resend-notification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminTradeInquiries_resendNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -575,7 +687,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "article:read" | "article:write" | "article:review" | "article:publish" | "article:archive" | "media:read" | "media:write" | "page:read" | "page:write" | "page:review" | "page:publish" | "user:manage";
+        Permission: "article:read" | "article:write" | "article:review" | "article:publish" | "article:archive" | "media:read" | "media:write" | "page:read" | "page:write" | "page:review" | "page:publish" | "user:manage" | "inquiry:read" | "inquiry:write";
         SessionUser: {
             permissions: components["schemas"]["Permission"][];
             id: string;
@@ -591,7 +703,7 @@ export interface components {
             expiresAt: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "PAGE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_NOT_SUBMITTED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "PAGE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_NOT_SUBMITTED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN" | "INTEGRATION_DISABLED" | "SIGNATURE_INVALID" | "INQUIRY_NOT_FOUND" | "ASSIGNEE_INVALID" | "NOTIFICATION_IN_PROGRESS";
         ErrorResponse: {
             /** @example 409 */
             statusCode: number;
@@ -1171,6 +1283,160 @@ export interface components {
         };
         SecurityEventListResponse: {
             items: components["schemas"]["SecurityEventResponse"][];
+        };
+        InquiryVolumeDto: {
+            amount?: string;
+            unit?: string;
+        };
+        InquiryContactDto: {
+            company: string;
+            email: string;
+            name?: string;
+            phone?: string;
+        };
+        InquiryUtmDto: {
+            source?: string;
+            medium?: string;
+            campaign?: string;
+        };
+        InquirySourceDto: {
+            landingPage?: string;
+            referrer?: string;
+            utm?: components["schemas"]["InquiryUtmDto"];
+        };
+        IngestTradeInquiryDto: {
+            /** @description Controlled requirement key → value (a choice requirement's option id). Checked against the contract. */
+            requirements: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            locale: "en" | "vi";
+            /** @description Website product id: every inquiry is for one HMV product. Checked against the contract. */
+            productId: string;
+            /** @description An origin id the product offers ("vietnam"); the product's first origin when left out. */
+            origin?: string;
+            destination?: string;
+            volume?: components["schemas"]["InquiryVolumeDto"];
+            application?: string;
+            transport?: string;
+            notes?: string;
+            contact: components["schemas"]["InquiryContactDto"];
+            source?: components["schemas"]["InquirySourceDto"];
+            /** @description When the buyer ticked the contact-consent box (the submission time). */
+            consentAt: string;
+        };
+        IngestTradeInquiryResponse: {
+            /** @description HMV-YYYY-XXXXXX: the reference the website shows the buyer. */
+            reference: string;
+            /** @description True when this idempotency key was already received: the existing inquiry is returned, nothing is created. */
+            duplicate: boolean;
+        };
+        /** @enum {string} */
+        TradeInquiryStatus: "NEW" | "CONTACTED" | "QUALIFIED" | "QUOTED" | "WON" | "LOST";
+        /** @enum {string} */
+        InquiryNotificationStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" | "SKIPPED";
+        TradeInquirySummary: {
+            status: components["schemas"]["TradeInquiryStatus"];
+            notificationStatus: components["schemas"]["InquiryNotificationStatus"];
+            id: string;
+            reference: string;
+            /** Format: date-time */
+            createdAt: string;
+            locale: string;
+            productId: string;
+            productName: string;
+            destination: string | null;
+            volumeAmount: string | null;
+            volumeUnit: string | null;
+            company: string;
+            contactName: string | null;
+            utmSource: string | null;
+            referrerOrigin: string | null;
+            assignedTo: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            lastActivityAt: string;
+        };
+        TradeInquiryListResponse: {
+            page: number;
+            pageSize: number;
+            total: number;
+            items: components["schemas"]["TradeInquirySummary"][];
+        };
+        TradeInquiryStatsResponse: {
+            total: number;
+            new: number;
+            contacted: number;
+            qualified: number;
+            quoted: number;
+            won: number;
+            lost: number;
+            /** @description Received since 00:00 Vietnam time (UTC+7). */
+            today: number;
+            last7Days: number;
+        };
+        InquiryAssigneeListResponse: {
+            items: components["schemas"]["UserRef"][];
+        };
+        InquiryRequirement: {
+            key: string;
+            label: string;
+            value: string;
+        };
+        TradeInquiryNoteResponse: {
+            id: string;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: components["schemas"]["UserRef"];
+        };
+        TradeInquiryDetailResponse: {
+            status: components["schemas"]["TradeInquiryStatus"];
+            notificationStatus: components["schemas"]["InquiryNotificationStatus"];
+            id: string;
+            reference: string;
+            /** Format: date-time */
+            createdAt: string;
+            locale: string;
+            productId: string;
+            productName: string;
+            destination: string | null;
+            volumeAmount: string | null;
+            volumeUnit: string | null;
+            company: string;
+            contactName: string | null;
+            utmSource: string | null;
+            referrerOrigin: string | null;
+            assignedTo: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            lastActivityAt: string;
+            origin: string | null;
+            application: string | null;
+            transport: string | null;
+            requirements: components["schemas"]["InquiryRequirement"][];
+            buyerNotes: string | null;
+            email: string;
+            phone: string | null;
+            landingPage: string | null;
+            utmMedium: string | null;
+            utmCampaign: string | null;
+            /** Format: date-time */
+            contactConsentAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            notificationAttempts: number;
+            /** Format: date-time */
+            notificationLastAttemptAt: string | null;
+            /** @description Whether the inbox offers "resend": a failed attempt, or one a crash left PENDING or SENDING for 5 minutes. */
+            notificationRetryable: boolean;
+            notes: components["schemas"]["TradeInquiryNoteResponse"][];
+        };
+        UpdateTradeInquiryDto: {
+            status?: components["schemas"]["TradeInquiryStatus"];
+            /** Format: uuid */
+            assignedToId?: string | null;
+        };
+        CreateTradeInquiryNoteDto: {
+            body: string;
         };
     };
     responses: never;
@@ -3406,6 +3672,481 @@ export interface operations {
             };
             /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    TradeInquiryIngest_ingest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 8-64 letters, digits or hyphens */
+                "Idempotency-Key": string;
+                /** @description hex HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>.<hex SHA-256 of the exact request body>") */
+                "X-HMV-Signature": string;
+                /** @description Unix time in seconds (±5 minutes) */
+                "X-HMV-Timestamp": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestTradeInquiryDto"];
+            };
+        };
+        responses: {
+            /** @description Known idempotency key: the existing inquiry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTradeInquiryResponse"];
+                };
+            };
+            /** @description New inquiry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestTradeInquiryResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SIGNATURE_INVALID */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INTEGRATION_DISABLED */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["TradeInquiryStatus"];
+                locale?: "en" | "vi";
+                productId?: string;
+                assignedToId?: string;
+                /** @description Only inquiries with nobody assigned. */
+                unassigned?: boolean;
+                /** @description Received on or after: a date is 00:00 of that Vietnam day; a date-time without an offset is Vietnam time. */
+                dateFrom?: string;
+                /** @description Received before the end of this Vietnam day (date), or before this instant (date-time). */
+                dateTo?: string;
+                utmSource?: string;
+                /** @description Reference, company, email, contact name, product or destination (case-insensitive). */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryListResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryStatsResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_assignees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InquiryAssigneeListResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INQUIRY_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTradeInquiryDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INQUIRY_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description ASSIGNEE_INVALID */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_addNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTradeInquiryNoteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryNoteResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INQUIRY_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminTradeInquiries_resendNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeInquiryDetailResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHENTICATED */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PERMISSION_DENIED | CSRF_TOKEN_INVALID | ORIGIN_NOT_ALLOWED */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INQUIRY_NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOTIFICATION_IN_PROGRESS: another attempt holds the notification; nothing was sent */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

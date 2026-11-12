@@ -47,6 +47,11 @@ export const ERROR_CODES = [
   'EMAIL_TAKEN',
   'UNKNOWN_ROLE',
   'LAST_ADMIN',
+  'INTEGRATION_DISABLED',
+  'SIGNATURE_INVALID',
+  'INQUIRY_NOT_FOUND',
+  'ASSIGNEE_INVALID',
+  'NOTIFICATION_IN_PROGRESS',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

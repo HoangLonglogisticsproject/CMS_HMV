@@ -32,6 +32,9 @@ const MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   EMAIL_TAKEN: "Email này đã có tài khoản. Không thể tạo trùng.",
   UNKNOWN_ROLE: "Vai trò không hợp lệ.",
   LAST_ADMIN: "Phải còn ít nhất một quản trị viên đang hoạt động: không thể khoá hoặc hạ quyền tài khoản này.",
+  INQUIRY_NOT_FOUND: "Không tìm thấy yêu cầu giao thương.",
+  ASSIGNEE_INVALID: "Người được giao phải là tài khoản đang hoạt động có quyền xử lý yêu cầu giao thương.",
+  NOTIFICATION_IN_PROGRESS: "Email thông báo cho yêu cầu này đang được gửi. Vui lòng đợi kết quả.",
 };
 
 const LOCALE_LABEL: Record<string, string> = { vi: "Tiếng Việt", en: "English" };

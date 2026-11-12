@@ -36,12 +36,15 @@ export const E2E = {
   },
   mediaDir: join(tmpdir(), "hmv-cms-e2e-media"),
   password: "e2e-only-password-0001",
+  /** Website ↔ CMS ingestion HMAC key for the E2E API only (docs/sales/TRADE_INQUIRIES.md). */
+  ingestSecret: "e2e-only-trade-inquiry-ingest-secret-0001",
   users: {
     editor: { email: "editor@e2e.test", name: "Biên Tập Viên E2E", roles: ["EDITOR"] },
     editor2: { email: "editor2@e2e.test", name: "Biên Tập Viên Hai", roles: ["EDITOR"] },
     reviewer: { email: "reviewer@e2e.test", name: "Người Duyệt E2E", roles: ["REVIEWER"] },
     viewer: { email: "viewer@e2e.test", name: "Người Xem E2E", roles: ["VIEWER"] },
     admin: { email: "admin@e2e.test", name: "Quản Trị E2E", roles: ["ADMIN"] },
+    sales: { email: "sales@e2e.test", name: "Kinh Doanh E2E", roles: ["SALES"] },
   },
 } as const;
 

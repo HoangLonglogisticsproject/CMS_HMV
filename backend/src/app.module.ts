@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
 import { PagesModule } from './modules/pages/pages.module';
+import { TradeInquiriesModule } from './modules/trade-inquiries/trade-inquiries.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './modules/users/users.module';
     ArticlesModule,
     PagesModule,
     UsersModule,
+    TradeInquiriesModule,
   ],
 })
 export class AppModule {}

@@ -14,6 +14,7 @@ import {
   Users,
   Settings,
   ListTodo,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import type { Permission } from "@/modules/auth/queries/use-session";
@@ -63,6 +64,20 @@ export const TARGET_NAVIGATION_IA: NavGroupConfig[] = [
         isActiveRoute: false,
         roadmapDescription: "Danh sách công việc chờ duyệt, nội dung cần phản hồi và thông báo tác vụ cá nhân.",
         targetMilestone: "Milestone Q3-Workflow",
+      },
+    ],
+  },
+  {
+    id: "sales",
+    label: "SALES",
+    items: [
+      {
+        id: "inquiries",
+        title: "Yêu cầu giao thương",
+        href: "/sales/inquiries",
+        icon: Inbox,
+        permission: "inquiry:read",
+        isActiveRoute: true,
       },
     ],
   },

@@ -6,11 +6,88 @@ const list = (value?: string) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** `value` without trailing slashes (a loop, not a regex: no backtracking on long runs of '/'). */
+export function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 /** Express `trust proxy`: unset = false, a number = hop count, anything else passed through ("loopback", CIDRs). */
 function trustProxy(value?: string): boolean | number | string {
   if (!value || value === 'false') return false;
   if (value === 'true') return true;
   return /^\d+$/.test(value) ? Number(value) : value;
+}
+
+/** Minimum length of the website ↔ CMS shared secret (HMAC key): 32 characters of random data or more. */
+export const INGEST_SECRET_MIN_LENGTH = 32;
+
+/** The CMS link in production notification emails: a parsed https URL with a host, without a trailing slash. */
+function productionCmsUrl(value: string) {
+  let url: URL | undefined;
+  try {
+    url = new URL(value);
+  } catch {
+    // reported below
+  }
+  if (url?.protocol !== 'https:' || !url.hostname)
+    throw new Error(
+      'CMS_PUBLIC_URL must be an https URL with a host in production',
+    );
+  return `${url.origin}${trimTrailingSlashes(url.pathname)}`;
+}
+
+/**
+ * Trade inquiries (docs/sales/TRADE_INQUIRIES.md): the website ingestion endpoint and the email notification.
+ * Both are off unless enabled; enabled with missing or weak settings, the API refuses to start rather than run open.
+ */
+function tradeInquiryConfig(env: NodeJS.ProcessEnv, isProduction: boolean) {
+  const ingestEnabled = env.TRADE_INQUIRY_INGEST_ENABLED === 'true';
+  const ingestSecret = env.TRADE_INQUIRY_INGEST_SECRET ?? '';
+  if (ingestEnabled && ingestSecret.length < INGEST_SECRET_MIN_LENGTH)
+    throw new Error(
+      `TRADE_INQUIRY_INGEST_SECRET must be at least ${INGEST_SECRET_MIN_LENGTH} characters when TRADE_INQUIRY_INGEST_ENABLED=true`,
+    );
+
+  const notifyEnabled = env.INQUIRY_NOTIFY_EMAIL_ENABLED === 'true';
+  const cmsPublicUrl = trimTrailingSlashes(
+    env.CMS_PUBLIC_URL ?? 'http://localhost:3000',
+  );
+  const to = list(env.INQUIRY_NOTIFY_TO);
+  if (notifyEnabled) {
+    const missing = [
+      ['INQUIRY_NOTIFY_TO', to.length],
+      ['INQUIRY_NOTIFY_FROM', env.INQUIRY_NOTIFY_FROM],
+      ['SMTP_HOST', env.SMTP_HOST],
+      ['CMS_PUBLIC_URL', env.CMS_PUBLIC_URL],
+    ].filter(([, value]) => !value);
+    if (missing.length)
+      throw new Error(
+        `${missing.map(([name]) => name).join(', ')} required when INQUIRY_NOTIFY_EMAIL_ENABLED=true`,
+      );
+  }
+
+  return {
+    ingestEnabled,
+    ingestSecret,
+    cmsPublicUrl:
+      isProduction && notifyEnabled
+        ? productionCmsUrl(env.CMS_PUBLIC_URL ?? '')
+        : cmsPublicUrl,
+    notify: {
+      enabled: notifyEnabled,
+      to,
+      from: env.INQUIRY_NOTIFY_FROM ?? '',
+      smtp: {
+        host: env.SMTP_HOST ?? '',
+        port: Number(env.SMTP_PORT ?? 587),
+        secure: env.SMTP_SECURE === 'true',
+        user: env.SMTP_USER ?? '',
+        pass: env.SMTP_PASS ?? '',
+      },
+    },
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -46,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     throw new Error(`Unknown STORAGE_DRIVER "${driver}"`);
 
   return {
+    tradeInquiries: tradeInquiryConfig(env, isProduction),
     isProduction,
     port,
     corsOrigins,
@@ -55,9 +133,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     storage: {
       driver: driver as 'local' | 'r2',
       localDir: env.LOCAL_STORAGE_DIR ?? 'storage/media',
-      publicBaseUrl: (
-        env.MEDIA_PUBLIC_BASE_URL ?? `http://localhost:${port}/media-files`
-      ).replace(/\/+$/, ''),
+      publicBaseUrl: trimTrailingSlashes(
+        env.MEDIA_PUBLIC_BASE_URL ?? `http://localhost:${port}/media-files`,
+      ),
       r2: {
         accountId: env.R2_ACCOUNT_ID ?? '',
         accessKeyId: env.R2_ACCESS_KEY_ID ?? '',
