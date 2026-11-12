@@ -130,5 +130,8 @@ export const settledPage = (page: number, pageCount: number, settled: boolean) =
 export const noteAfterSave = (current: string, saved: string) => (current === saved ? "" : current);
 
 /** mailto: with a subject naming the reference; the body is left to the salesperson. */
-export const buyerMailto = (email: string, reference: string, subject: string) =>
-  `mailto:${email}?subject=${encodeURIComponent(`HMV Global — ${reference} — ${subject}`)}`;
+export const buyerMailto = (email: string, reference: string, subject: string) => {
+  const mailSubject = `HMV Global — ${reference} — ${subject}`;
+  const encodedSubject = encodeURIComponent(mailSubject);
+  return `mailto:${email}?subject=${encodedSubject}`;
+};

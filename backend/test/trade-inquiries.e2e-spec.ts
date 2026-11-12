@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { TradeInquiry } from '@prisma/client';
 import request from 'supertest';
+import type { Mock } from 'vitest';
 import {
   INQUIRY_NOTIFIER,
   type InquiryNotifier,
@@ -122,6 +123,31 @@ const REFUSED: object[] = [
   cassava({ volume: [] }),
   cassava({ source: 'x' }),
 ];
+
+/** Code-unit order: deterministic, independent of the locale. */
+function compareStrings(a: string, b: string) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/**
+ * The next call of `send` waits until the test settles it; `started` resolves once the send began (the attempt
+ * claimed).
+ */
+function holdNextSend(send: Mock<InquiryNotifier['send']>) {
+  let settle: { resolve: () => void; reject: (err: Error) => void } | undefined;
+  let began: () => void = () => {};
+  const started = new Promise<void>((resolve) => (began = resolve));
+  send.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        settle = { resolve, reject };
+        began();
+      }),
+  );
+  return { started, settle: () => settle! };
+}
 
 describe('Trade inquiries (PostgreSQL)', () => {
   let t: TestApp;
@@ -281,6 +307,38 @@ describe('Trade inquiries (PostgreSQL)', () => {
       expect(await t.prisma.tradeInquiry.count()).toBe(0);
     });
 
+    it('contact email: a commercial address is accepted; malformed addresses are refused at contact.email', async () => {
+      const ok = await ingest(
+        cassava({
+          contact: {
+            company: 'Feed Co',
+            email: ' Procurement.EU+cassava@Feed-Co.example.com ',
+          },
+        }),
+      ).expect(201);
+      expect((await row(ok.body.reference)).email).toBe(
+        'procurement.eu+cassava@feed-co.example.com',
+      );
+
+      for (const email of [
+        'buyer @example.com', // malformed: a space
+        'buyer.example.com', // missing @
+        'buyer@@example.com',
+        'buyer@example', // malformed domain: no top-level domain
+        'buyer@-example.com',
+        'buyer@example..com',
+      ]) {
+        const res = await ingest(
+          cassava({ contact: { company: 'Feed Co', email } }),
+        ).expect(400);
+        expect(res.body.code).toBe('VALIDATION_FAILED');
+        expect(res.body.details).toEqual([
+          { path: 'contact.email', message: 'email must be an email address' },
+        ]);
+      }
+      expect(await t.prisma.tradeInquiry.count()).toBe(1);
+    });
+
     it.each(REFUSED.map((body) => [JSON.stringify(body).slice(0, 90), body]))(
       'validation refuses %s (400, nothing saved)',
       async (_name, body) => {
@@ -386,21 +444,6 @@ describe('Trade inquiries (PostgreSQL)', () => {
       }
     });
 
-    /** The next send waits until the test settles it; `started` resolves once the send began (the attempt claimed). */
-    function holdNextSend() {
-      let settle:
-        { resolve: () => void; reject: (err: Error) => void } | undefined;
-      let began: () => void = () => {};
-      const started = new Promise<void>((resolve) => (began = resolve));
-      notifier.send.mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            settle = { resolve, reject };
-            began();
-          }),
-      );
-      return { started, settle: () => settle! };
-    }
     const resend = (id: string) =>
       sales.post(`${ADMIN}/${id}/resend-notification`);
     const retries = async (id: string) =>
@@ -413,7 +456,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
       const { id } = await row(
         (await ingest(cassava()).expect(201)).body.reference,
       );
-      const held = holdNextSend();
+      const held = holdNextSend(notifier.send);
       const first = resend(id).then((r) => r);
       await held.started;
       const second = await resend(id).expect(409);
@@ -428,7 +471,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('a resend while the initial attempt is sending is refused; the inbox offers no resend; one email', async () => {
-      const held = holdNextSend();
+      const held = holdNextSend(notifier.send);
       const ingesting = ingest(cassava()).then((r) => r);
       await held.started;
       const [{ id, reference }] = await t.prisma.tradeInquiry.findMany();
@@ -448,7 +491,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('a failed attempt is FAILED; a later manual retry claims it and sends once', async () => {
-      const held = holdNextSend();
+      const held = holdNextSend(notifier.send);
       const ingesting = ingest(cassava()).then((r) => r);
       await held.started;
       held
@@ -469,7 +512,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('an attempt that crashed (SENDING for 5 minutes) can be taken over; its late result never overwrites the newer one', async () => {
-      const first = holdNextSend();
+      const first = holdNextSend(notifier.send);
       const ingesting = ingest(cassava()).then((r) => r);
       await first.started;
       const [{ id, reference }] = await t.prisma.tradeInquiry.findMany();
@@ -478,7 +521,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
         data: { notificationLastAttemptAt: new Date(Date.now() - 6 * 60_000) },
       });
       // Attempt 2 takes over and is still sending when attempt 1 ends, late and failed.
-      const second = holdNextSend();
+      const second = holdNextSend(notifier.send);
       const takeover = resend(id).then((r) => r);
       await second.started;
       first
@@ -686,9 +729,9 @@ describe('Trade inquiries (PostgreSQL)', () => {
 
       const { items } = (await sales.get(`${ADMIN}/assignees`).expect(200))
         .body;
-      expect(items.map((u: { id: string }) => u.id).sort()).toEqual(
-        [colleague.user.id, sales.user.id].sort(),
-      );
+      expect(
+        items.map((u: { id: string }) => u.id).sort(compareStrings),
+      ).toEqual([colleague.user.id, sales.user.id].sort(compareStrings));
     });
 
     it('internal notes: added, audited, listed on the detail, and moving lastActivityAt', async () => {

@@ -124,16 +124,16 @@ type SmtpConfig = AppConfig['tradeInquiries']['notify']['smtp'];
  * inside the attempt budget.
  */
 export function smtpTransportOptions(smtp: SmtpConfig) {
-  return {
+  const common = {
     host: smtp.host,
     port: smtp.port,
-    secure: smtp.secure,
-    requireTLS: !smtp.secure,
     auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
     connectionTimeout: 2_000,
     greetingTimeout: 2_000,
     socketTimeout: NOTIFY_TIMEOUT_MS,
   };
+  if (smtp.secure) return { ...common, secure: true };
+  return { ...common, requireTLS: true };
 }
 
 /** SMTP via nodemailer, encrypted (smtpTransportOptions). */

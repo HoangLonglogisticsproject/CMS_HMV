@@ -274,6 +274,10 @@ test.describe("sales inbox formatting", () => {
     expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips")).toBe(
       "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
     );
+    // Reserved characters in the product name stay inside the subject: they never start another query parameter.
+    expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Nuts & seeds?#")).toBe(
+      "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Nuts%20%26%20seeds%3F%23",
+    );
   });
 });
 

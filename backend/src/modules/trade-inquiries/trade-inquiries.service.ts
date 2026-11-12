@@ -547,7 +547,7 @@ export class TradeInquiriesService {
     return this.detail(id);
   }
 
-  async addNote(
+  addNote(
     id: string,
     body: string,
     actor: Actor,

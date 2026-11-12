@@ -4,6 +4,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDefined,
+  IsEmail,
   IsIn,
   IsISO8601,
   IsObject,
@@ -27,7 +28,6 @@ import { INQUIRY_LOCALES } from './inquiry-contract';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PATH = /^\/(?!\/)[^?#\s]*$/;
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
 const UTM = /^[\w.+\- ]*$/;
@@ -74,7 +74,7 @@ export class InquiryContactDto {
   @IsString()
   @Transform(trim)
   @MaxLength(254)
-  @Matches(EMAIL, { message: 'email must be an email address' })
+  @IsEmail({}, { message: 'email must be an email address' })
   email: string;
 
   @IsOptional()

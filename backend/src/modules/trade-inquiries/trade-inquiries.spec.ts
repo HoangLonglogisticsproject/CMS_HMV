@@ -442,18 +442,19 @@ describe('SMTP transport', () => {
     pass: 'p',
   };
   it('is always encrypted: implicit TLS when secure, STARTTLS required otherwise', () => {
-    expect(
-      smtpTransportOptions({ ...smtp, port: 465, secure: true }),
-    ).toMatchObject({
-      secure: true,
-      requireTLS: false,
-      port: 465,
-    });
-    expect(smtpTransportOptions(smtp)).toMatchObject({
-      secure: false,
-      requireTLS: true,
-      port: 587,
-    });
+    const implicit = smtpTransportOptions({ ...smtp, port: 465, secure: true });
+    expect(implicit).toMatchObject({ secure: true, port: 465 });
+    expect(implicit).not.toHaveProperty('requireTLS');
+
+    const starttls = smtpTransportOptions(smtp);
+    expect(starttls).toMatchObject({ requireTLS: true, port: 587 });
+    // Nothing that could turn TLS off or leave it optional: no secure:false, ignoreTLS or relaxed certificates.
+    expect(starttls).not.toHaveProperty('secure');
+    expect(starttls).not.toHaveProperty('ignoreTLS');
+    expect(starttls).not.toHaveProperty('tls');
+    expect(implicit).not.toHaveProperty('ignoreTLS');
+    expect(implicit).not.toHaveProperty('tls');
+
     expect(smtpTransportOptions({ ...smtp, user: '' }).auth).toBeUndefined();
   });
 });

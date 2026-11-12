@@ -1,8 +1,8 @@
 import { InquiryDetailView } from "@/modules/sales/components/inquiry-detail-view";
 
-interface PageProps {
+type PageProps = Readonly<{
   params: Promise<{ id: string }>;
-}
+}>;
 
 export default async function InquiryDetailPage({ params }: PageProps) {
   const { id } = await params;
