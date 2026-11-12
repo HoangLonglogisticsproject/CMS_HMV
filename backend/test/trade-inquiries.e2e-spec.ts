@@ -372,7 +372,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
       const error = vi.spyOn(Logger.prototype, 'error');
       // The first notification write is the claim (PENDING → SENDING).
       const claim = vi
-        .spyOn(t.prisma.tradeInquiry, 'updateMany')
+        .spyOn(t.prisma.tradeInquiry, 'update')
         .mockRejectedValueOnce(
           Object.assign(new Error('connection lost for buyer@example.com'), {
             code: 'P1001',

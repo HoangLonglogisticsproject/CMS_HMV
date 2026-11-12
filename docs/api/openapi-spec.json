@@ -3809,6 +3809,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "NOTIFICATION_IN_PROGRESS: another attempt holds the notification; nothing was sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [

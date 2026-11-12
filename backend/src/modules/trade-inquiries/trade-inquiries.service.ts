@@ -248,7 +248,7 @@ export class TradeInquiriesService {
   /**
    * One notification attempt, claimed in PostgreSQL so that one inquiry is never emailed by two attempts at once, on
    * any number of API instances: a single conditional update moves the notification to SENDING and counts the attempt;
-   * only the caller whose update matched (count 1) sends. The initial attempt claims PENDING; a manual resend claims
+   * only the caller whose update matched a row sends. The initial attempt claims PENDING; a manual resend claims
    * what manualClaim() allows. The attempt number is the claim's token: the result is written only while the
    * notification is still SENDING under that number, so an attempt that was taken over can never overwrite a newer one.
    * A failed or timed-out send is a FAILED result, not an error; only the database can throw.
@@ -267,19 +267,8 @@ export class TradeInquiriesService {
       });
       return skipped.count === 1 ? 'SKIPPED' : 'IN_PROGRESS';
     }
-    const claim = await this.prisma.tradeInquiry.updateMany({
-      where: { id, ...claimable },
-      data: {
-        notificationStatus: 'SENDING',
-        notificationAttempts: { increment: 1 },
-        notificationLastAttemptAt: now,
-      },
-    });
-    if (claim.count !== 1) return 'IN_PROGRESS';
-    // Read after the claim: SENDING with a fresh timestamp cannot be claimed again, so this is our attempt's number.
-    const inquiry = await this.prisma.tradeInquiry.findUniqueOrThrow({
-      where: { id },
-    });
+    const inquiry = await this.claim(id, claimable, now);
+    if (!inquiry) return 'IN_PROGRESS';
     const result = await this.attempt(inquiry);
     await this.prisma.tradeInquiry.updateMany({
       where: {
@@ -290,6 +279,35 @@ export class TradeInquiriesService {
       data: { notificationStatus: result },
     });
     return result;
+  }
+
+  /**
+   * The claim itself: one conditional UPDATE … RETURNING. It returns the claimed row, whose notificationAttempts is
+   * this attempt's number (no separate read that a takeover could slip in front of), or null when the notification
+   * is not claimable (the update matched no row).
+   */
+  private async claim(
+    id: string,
+    claimable: Prisma.TradeInquiryWhereInput,
+    now: Date,
+  ) {
+    try {
+      return await this.prisma.tradeInquiry.update({
+        where: { id, AND: [claimable] },
+        data: {
+          notificationStatus: 'SENDING',
+          notificationAttempts: { increment: 1 },
+          notificationLastAttemptAt: now,
+        },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      )
+        return null;
+      throw err;
+    }
   }
 
   /** Sends the new-inquiry email within the time budget: SENT, or FAILED (logged with the reference and a code). */

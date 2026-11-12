@@ -191,6 +191,12 @@ export class AdminTradeInquiriesController {
     type: ErrorResponse,
     description: 'INQUIRY_NOT_FOUND',
   })
+  @ApiResponse({
+    status: 409,
+    type: ErrorResponse,
+    description:
+      'NOTIFICATION_IN_PROGRESS: another attempt holds the notification; nothing was sent',
+  })
   resendNotification(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() auth: AuthContext,
