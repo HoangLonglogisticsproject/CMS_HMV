@@ -1,3 +1,5 @@
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { loadConfig, trimTrailingSlashes } from '../../config';
 import { AppError } from '../../common/errors';
 import { blankToNull, buildBrief } from './inquiry-brief';
@@ -20,7 +22,7 @@ import {
   notificationRetryable,
   vietnamBound,
 } from './trade-inquiries.service';
-import { type IngestTradeInquiryDto, isFilterDate } from './trade-inquiry.dto';
+import { IngestTradeInquiryDto, isFilterDate } from './trade-inquiry.dto';
 
 // Shared with the website (HMV_landingpage src/next/inquiry/service.test.js and docs/inbound/TRADE_DESK_DELIVERY.md):
 // both repositories must produce this exact signature over these exact body bytes, or the integration has drifted.
@@ -55,6 +57,23 @@ describe('ingest signature', () => {
     ).toBe(v.signature);
     expect(check({})).toBe('ok');
     expect(check({ body: Buffer.from(v.body, 'utf8') })).toBe('ok');
+  });
+
+  it('the vector body is a valid product-led inquiry: it passes the ingestion DTO and the contract', async () => {
+    const dto = plainToInstance(IngestTradeInquiryDto, JSON.parse(v.body));
+    // The app's ValidationPipe options: unknown fields are refused.
+    expect(
+      await validate(dto, { whitelist: true, forbidNonWhitelisted: true }),
+    ).toEqual([]);
+    expect(buildBrief(dto)).toMatchObject({
+      productId: 'dried-cassava-chips',
+      productName: 'Dried cassava chips',
+      origin: 'Vietnam',
+      destination: 'Singapore',
+      volumeAmount: '5000',
+      application: 'Bioethanol',
+      transport: 'Sea freight (FCL)',
+    });
   });
 
   it('the body is signed: another body, or the same JSON serialized differently, is refused', () => {
