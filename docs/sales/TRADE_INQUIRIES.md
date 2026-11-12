@@ -139,7 +139,10 @@ that looks like a field of the email. The saved inquiry is unchanged.
 
 - The 2.5 s budget **cancels** the send: an `AbortController` aborts it (nodemailer closes the SMTP connection) and
   `FAILED` is recorded only once the send has stopped, so nothing keeps sending in the background and a resend cannot
-  overlap it. If the server had already accepted the message when the budget ran out, the attempt resolves as `SENT`.
+  overlap it. A send that completed within the budget is `SENT`. If the budget runs out after the SMTP server took the
+  message but before its reply was processed, the attempt is recorded as `FAILED` (`ETIMEOUT`) although the email may
+  have been delivered: check the `INQUIRY_NOTIFY_TO` mailbox for it before a manual resend, which would send a second
+  email.
 - A failure or timeout never rolls back the inquiry: it is stored as `FAILED` and logged as
   `Inquiry <reference>: notification email failed (<error code>)` — no addresses, credentials or buyer data.
 - Once the inquiry is committed the website gets its reference, even if recording the notification state then fails
