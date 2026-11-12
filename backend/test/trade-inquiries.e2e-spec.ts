@@ -320,17 +320,21 @@ describe('Trade inquiries (PostgreSQL)', () => {
         'procurement.eu+cassava@feed-co.example.com',
       );
 
-      for (const email of [
+      const malformed = [
         'buyer @example.com', // malformed: a space
         'buyer.example.com', // missing @
         'buyer@@example.com',
         'buyer@example', // malformed domain: no top-level domain
         'buyer@-example.com',
         'buyer@example..com',
-      ]) {
-        const res = await ingest(
-          cassava({ contact: { company: 'Feed Co', email } }),
-        ).expect(400);
+      ];
+      const refused = await Promise.all(
+        malformed.map((email) =>
+          ingest(cassava({ contact: { company: 'Feed Co', email } })),
+        ),
+      );
+      for (const res of refused) {
+        expect(res.status).toBe(400);
         expect(res.body.code).toBe('VALIDATION_FAILED');
         expect(res.body.details).toEqual([
           { path: 'contact.email', message: 'email must be an email address' },
