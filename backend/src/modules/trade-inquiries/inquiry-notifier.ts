@@ -14,7 +14,8 @@ export interface InquiryEmail {
 export interface InquiryNotifier {
   /** False when notification email is disabled: inquiries are marked SKIPPED, nothing is sent. */
   readonly enabled: boolean;
-  send(message: InquiryEmail): Promise<void>;
+  /** Sends one message. When `signal` aborts, the send is cancelled (connection closed) and the promise rejects. */
+  send(message: InquiryEmail, signal: AbortSignal): Promise<void>;
 }
 
 export const INQUIRY_NOTIFIER = Symbol('INQUIRY_NOTIFIER');
@@ -48,12 +49,23 @@ const GOAL_LABEL: Record<string, string> = {
   logistics: 'Logistics',
   customs: 'Customs & compliance',
 };
-/** Header values: no line breaks (header injection), collapsed whitespace. */
+// Line breaks a mail client may render: CR, LF, VT, FF, NEL and the Unicode line/paragraph separators.
+const BREAK = /\r\n|[\r\n\v\f\u0085\u2028\u2029]/;
+
+/** One line: line breaks and runs of whitespace collapsed, so a value cannot start a line of its own. */
 const oneLine = (s: string) =>
+  s.split(BREAK).join(' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * A value whose line breaks are kept (free text): every continuation line indented under its field, so buyer text can
+ * never start a line that reads like a field of the email ("Open in the CMS: …").
+ */
+const indented = (s: string) =>
   s
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .split(BREAK)
+    .map((l) => l.replace(/[^\S\n]+/g, ' ').trim())
+    .join('\n    ');
 
 /** The sales summary email: plain text, so buyer input is never rendered as HTML. */
 export function buildInquiryEmail(
@@ -63,8 +75,9 @@ export function buildInquiryEmail(
   const what =
     inquiry.productName ??
     (inquiry.goods || GOAL_LABEL[inquiry.goal] || inquiry.goal);
+  // Display formatting only: the saved inquiry keeps the buyer's text as sent.
   const line = (label: string, value: string | null | undefined) =>
-    value ? [`${label}: ${value}`] : [];
+    value && oneLine(value) ? [`${label}: ${oneLine(value)}`] : [];
   const volume = inquiry.volumeAmount
     ? `${inquiry.volumeAmount} ${inquiry.volumeUnit ?? ''}`.trim()
     : null;
@@ -96,10 +109,12 @@ export function buildInquiryEmail(
       ? [
           '',
           'Requirements:',
-          ...inquiry.requirements.map((r) => `- ${r.label}: ${r.value}`),
+          ...inquiry.requirements.map(
+            (r) => `- ${oneLine(r.label)}: ${indented(r.value)}`,
+          ),
         ]
       : []),
-    ...(source ? ['', `Source: ${source}`] : []),
+    ...(source ? ['', `Source: ${oneLine(source)}`] : []),
     '',
     `Open in the CMS: ${cmsPublicUrl}/sales/inquiries/${inquiry.id}`,
   ].join('\n');
@@ -125,12 +140,14 @@ export function smtpNotifier(
   });
   return {
     enabled: true,
-    async send(message) {
+    async send(message, signal) {
+      // nodemailer's SMTP transport honours the signal: on abort it closes the connection and rejects (EABORT).
       await transport.sendMail({
         from: config.from,
         to: config.to,
         subject: message.subject,
         text: message.text,
+        signal,
       });
     },
   };
@@ -142,19 +159,27 @@ export const disabledNotifier: InquiryNotifier = {
     Promise.reject(new Error('Inquiry notification email is disabled')),
 };
 
-/** Rejects after `ms` if `promise` has not settled. */
-export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () =>
-        reject(
-          Object.assign(new Error(`Timed out after ${ms} ms`), {
-            code: 'ETIMEOUT',
-          }),
-        ),
-      ms,
-    );
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+/**
+ * One notification attempt within `ms`: the send gets an AbortSignal that fires at the budget, and this settles only
+ * once the send itself has finished or been cancelled. A timeout therefore never leaves a send running in the
+ * background after FAILED is recorded, and a resend cannot overlap it. Rejects with code ETIMEOUT when cancelled.
+ */
+export async function sendWithin(
+  notifier: InquiryNotifier,
+  message: InquiryEmail,
+  ms: number,
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    await notifier.send(message, controller.signal);
+  } catch (err) {
+    if (controller.signal.aborted)
+      throw Object.assign(new Error(`Cancelled after ${ms} ms`), {
+        code: 'ETIMEOUT',
+      });
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }

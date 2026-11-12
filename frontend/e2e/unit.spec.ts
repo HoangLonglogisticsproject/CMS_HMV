@@ -15,9 +15,12 @@ import {
 import { getArticlePublishReadiness } from "@/modules/content/articles/utils/publish-readiness";
 import {
   buyerMailto,
+  formatVietnamDateTime,
   inquirySource,
   inquirySubject,
   inquiryVolume,
+  noteAfterSave,
+  settledPage,
   whatsAppLink,
 } from "@/modules/sales/utils/inquiry-format";
 
@@ -270,5 +273,29 @@ test.describe("sales inbox formatting", () => {
     expect(buyerMailto("buyer@example.com", "HMV-2026-7KQ4XM", "Dried cassava chips")).toBe(
       "mailto:buyer@example.com?subject=HMV%20Global%20%E2%80%94%20HMV-2026-7KQ4XM%20%E2%80%94%20Dried%20cassava%20chips",
     );
+  });
+});
+
+test.describe("sales inbox state", () => {
+  test("page: back to the last page only on a settled response that has fewer pages", () => {
+    expect(settledPage(2, 1, true)).toBe(1); // page 2, results shrank to one page
+    expect(settledPage(5, 3, true)).toBe(3);
+    expect(settledPage(2, 1, false)).toBe(2); // placeholder data during a filter change: unchanged
+    expect(settledPage(2, 2, true)).toBe(2);
+    expect(settledPage(1, 1, true)).toBe(1);
+  });
+
+  test("note box: cleared after a save only if it still holds the saved text", () => {
+    expect(noteAfterSave("Called the buyer", "Called the buyer")).toBe("");
+    expect(noteAfterSave("Called the buyer. Also: samples", "Called the buyer")).toBe("Called the buyer. Also: samples");
+    expect(noteAfterSave("", "Called the buyer")).toBe("");
+  });
+
+  test("timestamps in Vietnam time whatever the browser zone", () => {
+    // 17:00 UTC is 00:00 the next day in Vietnam.
+    const shown = formatVietnamDateTime("2026-11-11T17:00:00Z");
+    expect(shown).toContain("00:00");
+    expect(shown).toContain("12/11");
+    expect(formatVietnamDateTime(null)).toBe("—");
   });
 });

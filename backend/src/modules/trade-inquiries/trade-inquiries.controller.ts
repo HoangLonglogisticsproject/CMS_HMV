@@ -52,8 +52,8 @@ const actor = (auth: AuthContext) => ({ userId: auth.userId, ip: auth.ip });
 export class TradeInquiryIngestController {
   constructor(private readonly inquiries: TradeInquiriesService) {}
 
-  // SECURITY: @Public() opts out of the session guard only. TradeInquiryIngestGuard (HMAC over timestamp and
-  // idempotency key with the shared secret) protects this route; it is not reachable without that secret.
+  // SECURITY: @Public() opts out of the session guard only. TradeInquiryIngestGuard (HMAC over timestamp, idempotency
+  // key and the raw body's SHA-256 with the shared secret) protects this route; it is not reachable without that secret.
   @Post()
   @Public()
   @UseGuards(TradeInquiryIngestGuard)
@@ -65,7 +65,8 @@ export class TradeInquiryIngestController {
   @ApiHeader({
     name: 'X-HMV-Signature',
     required: true,
-    description: 'hex HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>")',
+    description:
+      'hex HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>.<hex SHA-256 of the exact request body>")',
   })
   @ApiHeader({
     name: 'Idempotency-Key',

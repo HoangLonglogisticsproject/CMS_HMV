@@ -168,12 +168,24 @@ export const GOAL_REQUIREMENTS: Record<
   ],
 };
 
+/**
+ * `table[key]` only for the table's own keys: website input is never used to reach inherited members
+ * ("__proto__", "constructor", "toString"…), which would pass a plain `table[key]` truthiness check.
+ */
+export const lookup = <T>(
+  table: Record<string, T> | undefined,
+  key: string | null | undefined,
+): T | undefined =>
+  table && typeof key === 'string' && Object.hasOwn(table, key)
+    ? table[key]
+    : undefined;
+
 export const requirementsFor = (
   goal: InquiryGoal,
   productId: string | null | undefined,
 ) =>
   goal === 'sourcing'
-    ? (PRODUCTS[productId ?? '']?.requirements ?? [])
+    ? (lookup(PRODUCTS, productId)?.requirements ?? [])
     : GOAL_REQUIREMENTS[goal];
 
 /** Stored requirement: the controlled key, its label and the value (an option's label for choices). */

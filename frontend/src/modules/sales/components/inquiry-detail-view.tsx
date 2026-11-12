@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/modules/auth/queries/use-session";
 import { errorMessage } from "@/lib/api/errors";
-import { formatDateTime } from "@/lib/utils/format";
 import {
   type InquiryDetail,
   type InquiryStatus,
@@ -27,9 +26,11 @@ import {
   STATUS_LABEL,
   STATUS_VARIANT,
   buyerMailto,
+  formatVietnamDateTime,
   inquirySource,
   inquirySubject,
   inquiryVolume,
+  noteAfterSave,
   whatsAppLink,
 } from "../utils/inquiry-format";
 
@@ -142,7 +143,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
         </div>
         <p className="text-xs text-slate-600">
           <strong className="text-slate-900">{inquiry.company}</strong> · {subject} ·{" "}
-          {GOAL_LABEL[inquiry.goal] ?? inquiry.goal} · nhận lúc {formatDateTime(inquiry.createdAt)}
+          {GOAL_LABEL[inquiry.goal] ?? inquiry.goal} · nhận lúc {formatVietnamDateTime(inquiry.createdAt)}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="h-8 text-xs bg-[#087EC2] hover:bg-[#066ba8] text-white gap-1.5">
@@ -198,7 +199,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
               {inquiry.notes.map((n) => (
                 <li key={n.id} className="rounded-md border border-slate-100 p-2.5 text-xs" data-testid="inquiry-note">
                   <div className="text-[11px] text-slate-500">
-                    {n.createdBy.displayName} · {formatDateTime(n.createdAt)}
+                    {n.createdBy.displayName} · {formatVietnamDateTime(n.createdAt)}
                   </div>
                   <div className="mt-1 whitespace-pre-wrap text-slate-800">{n.body}</div>
                 </li>
@@ -209,9 +210,10 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
                 className="space-y-2"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  addNote.mutate(note.trim(), {
+                  const draft = note;
+                  addNote.mutate(draft.trim(), {
                     onSuccess: () => {
-                      setNote("");
+                      setNote((current) => noteAfterSave(current, draft));
                       toast.success("Đã thêm ghi chú");
                     },
                     onError: (err) => toast.error("Không thêm được ghi chú", { description: errorMessage(err) }),
@@ -223,6 +225,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
                   placeholder="Ví dụ: đã gọi, người mua cần mẫu trước tuần sau…"
                   value={note}
                   maxLength={4000}
+                  disabled={addNote.isPending}
                   onChange={(e) => setNote(e.target.value)}
                 />
                 <Button type="submit" size="sm" className="h-8 text-xs" disabled={!note.trim() || addNote.isPending}>
@@ -282,7 +285,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
               <Field label="Người liên hệ" value={inquiry.contactName} />
               <Field label="Email" value={<a className="text-[#087EC2] hover:underline" href={`mailto:${inquiry.email}`}>{inquiry.email}</a>} />
               <Field label="Điện thoại" value={inquiry.phone} />
-              <Field label="Đồng ý liên hệ" value={formatDateTime(inquiry.contactConsentAt)} />
+              <Field label="Đồng ý liên hệ" value={formatVietnamDateTime(inquiry.contactConsentAt)} />
             </dl>
           </Section>
 
@@ -301,7 +304,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
               {NOTIFICATION_LABEL[inquiry.notificationStatus]}
             </p>
             <p className="text-[11px] text-slate-500">
-              {inquiry.notificationAttempts} lần gửi · lần cuối {formatDateTime(inquiry.notificationLastAttemptAt)}
+              {inquiry.notificationAttempts} lần gửi · lần cuối {formatVietnamDateTime(inquiry.notificationLastAttemptAt)}
             </p>
             {canWrite && (inquiry.notificationStatus === "FAILED" || inquiry.notificationStatus === "PENDING") && (
               <Button
@@ -326,9 +329,9 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
 
           <Section title="Thời gian">
             <dl className="space-y-1.5">
-              <Field label="Nhận lúc" value={formatDateTime(inquiry.createdAt)} />
-              <Field label="Hoạt động gần nhất" value={formatDateTime(inquiry.lastActivityAt)} />
-              <Field label="Cập nhật" value={formatDateTime(inquiry.updatedAt)} />
+              <Field label="Nhận lúc" value={formatVietnamDateTime(inquiry.createdAt)} />
+              <Field label="Hoạt động gần nhất" value={formatVietnamDateTime(inquiry.lastActivityAt)} />
+              <Field label="Cập nhật" value={formatVietnamDateTime(inquiry.updatedAt)} />
             </dl>
           </Section>
         </div>

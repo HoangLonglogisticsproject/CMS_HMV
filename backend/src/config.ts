@@ -16,6 +16,21 @@ function trustProxy(value?: string): boolean | number | string {
 /** Minimum length of the website ↔ CMS shared secret (HMAC key): 32 characters of random data or more. */
 export const INGEST_SECRET_MIN_LENGTH = 32;
 
+/** The CMS link in production notification emails: a parsed https URL with a host, without a trailing slash. */
+function productionCmsUrl(value: string) {
+  let url: URL | undefined;
+  try {
+    url = new URL(value);
+  } catch {
+    // reported below
+  }
+  if (url?.protocol !== 'https:' || !url.hostname)
+    throw new Error(
+      'CMS_PUBLIC_URL must be an https URL with a host in production',
+    );
+  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+}
+
 /**
  * Trade inquiries (docs/sales/TRADE_INQUIRIES.md): the website ingestion endpoint and the email notification.
  * Both are off unless enabled; enabled with missing or weak settings, the API refuses to start rather than run open.
@@ -46,13 +61,14 @@ function tradeInquiryConfig(env: NodeJS.ProcessEnv, isProduction: boolean) {
         `${missing.map(([name]) => name).join(', ')} required when INQUIRY_NOTIFY_EMAIL_ENABLED=true`,
       );
   }
-  if (isProduction && notifyEnabled && !cmsPublicUrl.startsWith('https://'))
-    throw new Error('CMS_PUBLIC_URL must be an https URL in production');
 
   return {
     ingestEnabled,
     ingestSecret,
-    cmsPublicUrl,
+    cmsPublicUrl:
+      isProduction && notifyEnabled
+        ? productionCmsUrl(env.CMS_PUBLIC_URL ?? '')
+        : cmsPublicUrl,
     notify: {
       enabled: notifyEnabled,
       to,

@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCan } from "@/modules/auth/queries/use-session";
 import { errorMessage } from "@/lib/api/errors";
-import { formatDateTime } from "@/lib/utils/format";
 import {
   type InquiryListParams,
   type InquiryStatus,
@@ -27,9 +26,11 @@ import {
   PRODUCT_LABEL,
   STATUS_LABEL,
   STATUS_VARIANT,
+  formatVietnamDateTime,
   inquirySource,
   inquirySubject,
   inquiryVolume,
+  settledPage,
 } from "../utils/inquiry-format";
 
 const PAGE_SIZE = 20;
@@ -94,12 +95,16 @@ function InquiryInbox() {
     dateTo: dateTo || undefined,
     utmSource: utmSource || undefined,
   };
-  const { data: list, isLoading, error: listError, isFetching } = useTradeInquiries(params);
+  const { data: list, isLoading, error: listError, isFetching, isPlaceholderData } = useTradeInquiries(params);
   const { data: stats } = useTradeInquiryStats();
   const { data: assignees } = useInquiryAssignees();
   const items = useMemo(() => list?.items ?? [], [list]);
   const total = list?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // A settled response with fewer pages than the current one: follow it to its last page (set during render, so
+  // "Trang 2/1" is never shown).
+  const settled = settledPage(page, pageCount, Boolean(list) && !isPlaceholderData);
+  if (settled !== page) setPage(settled);
   const filtered = Boolean(search || status || productId || goal || assignee || dateFrom || dateTo || utmSource);
 
   const columns = useMemo<ColumnDef<InquirySummary>[]>(
@@ -115,7 +120,7 @@ function InquiryInbox() {
             >
               {row.original.reference}
             </Link>
-            <div className="text-[11px] text-slate-500">{formatDateTime(row.original.createdAt)}</div>
+            <div className="text-[11px] text-slate-500">{formatVietnamDateTime(row.original.createdAt)}</div>
           </div>
         ),
       },
@@ -352,8 +357,8 @@ function InquiryInbox() {
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
-          <div>
-            <strong>{total}</strong> yêu cầu · Trang {page}/{pageCount}
+          <div data-testid="inquiries-pagination">
+            <strong>{total}</strong> yêu cầu · Trang {Math.min(page, pageCount)}/{pageCount}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1} className="h-7 text-xs px-2.5">

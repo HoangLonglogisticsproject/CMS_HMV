@@ -91,11 +91,18 @@ Headers on `POST /api/v1/integrations/trade-inquiries`:
 | --- | --- |
 | `Idempotency-Key` | 8–64 characters `[A-Za-z0-9-]` (the website sends a UUID per submission, reused on retry) |
 | `X-HMV-Timestamp` | Unix seconds |
-| `X-HMV-Signature` | lower-case hex `HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>")` |
+| `X-HMV-Signature` | lower-case hex `HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>.<bodySha256>")` |
 
-The CMS refuses a timestamp more than 300 s from its clock, compares signatures in constant time, and checks the key
-format only after the signature. No contact data is in the headers. The body is JSON validated against
-`IngestTradeInquiryDto`; unknown fields are refused.
+`bodySha256` is the lower-case hex SHA-256 of the **exact request body bytes**. The sender serializes the JSON once and
+uses that same string for the hash and as the HTTP body; the CMS hashes the raw body it received (`req.rawBody`, the app
+runs with `rawBody: true`), never re-serialized JSON. Captured headers therefore cannot be replayed with another body
+within the time window, and a body that is the same JSON written differently does not verify either.
+
+The CMS checks the signature in constant time (`timingSafeEqual`) before the body is validated or used, then refuses a
+timestamp more than 300 s from its clock, then checks the key format. No contact data is in the headers. The body is
+JSON validated against `IngestTradeInquiryDto`; unknown fields are refused, `contact` must be an object, and product,
+origin, unit, application, transport and requirement option ids are matched as the contract's own keys only
+(`__proto__`, `constructor`… are unknown values, a 400).
 
 Shared test vector (also in the website's `docs/inbound/TRADE_DESK_DELIVERY.md` and tests; both repositories assert it):
 
@@ -103,8 +110,12 @@ Shared test vector (also in the website's `docs/inbound/TRADE_DESK_DELIVERY.md` 
 secret          hmv-shared-test-vector-secret-0123456789abcdef
 timestamp       1767225600
 idempotencyKey  0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69
-signature       07793521e0fd555bb265faff963e5bcb9ebb252c6781190a75e4a53f32e1be60
+body            {"locale":"en","goal":"customs","goods":"Test cargo","requirements":{},"contact":{"company":"Example Co","email":"buyer@example.com"},"consentAt":"2026-01-01T00:00:00.000Z"}
+bodySha256      f440d4e1f37ac7063006f0ce11896b0eee0632451af410d48ed7c5f5b873dec1
+signature       7c05a879b426c6be25faf502b443dc310a71424044bf4d32b617e137d8d2d920
 ```
+
+(`body` is the exact string: no trailing newline. Signed string: `1767225600.0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69.f440d4e1…dec1`.)
 
 Responses:
 
@@ -113,7 +124,7 @@ Responses:
 | 201 `{reference, duplicate:false}` | Created | Show the reference |
 | 200 `{reference, duplicate:true}` | This key was already received; nothing created, no email | Show the reference |
 | 400 `VALIDATION_FAILED` | Body or key invalid | Do not retry |
-| 401 `SIGNATURE_INVALID` | Missing/wrong signature, stale timestamp | Configuration error; alert |
+| 401 `SIGNATURE_INVALID` | Missing/wrong signature, stale timestamp, body changed after signing | Configuration error; alert |
 | 503 `INTEGRATION_DISABLED` | `TRADE_INQUIRY_INGEST_ENABLED` is not `true` | Show the failure state with retry/email fallback |
 
 Idempotency is the unique `idempotencyKey` column, so concurrent repeats of one key still create one row.
@@ -121,11 +132,19 @@ Idempotency is the unique `idempotencyKey` column, so concurrent repeats of one 
 ## Notification email
 
 After the inquiry is committed, one email goes to `INQUIRY_NOTIFY_TO` (SMTP via nodemailer, 2 s connect/greeting,
-2.5 s overall). Subject `New HMV Trade Inquiry — <product or goods> — <reference>`, plain-text summary, link to
-`CMS_PUBLIC_URL/sales/inquiries/<id>`.
+2.5 s socket, 2.5 s overall). Subject `New HMV Trade Inquiry — <product or goods> — <reference>`, plain-text summary,
+link to `CMS_PUBLIC_URL/sales/inquiries/<id>`. Buyer values are display-formatted: single-value fields are collapsed to
+one line, free-text requirement values keep their lines indented under the field, so buyer text can never start a line
+that looks like a field of the email. The saved inquiry is unchanged.
 
+- The 2.5 s budget **cancels** the send: an `AbortController` aborts it (nodemailer closes the SMTP connection) and
+  `FAILED` is recorded only once the send has stopped, so nothing keeps sending in the background and a resend cannot
+  overlap it. If the server had already accepted the message when the budget ran out, the attempt resolves as `SENT`.
 - A failure or timeout never rolls back the inquiry: it is stored as `FAILED` and logged as
   `Inquiry <reference>: notification email failed (<error code>)` — no addresses, credentials or buyer data.
+- Once the inquiry is committed the website gets its reference, even if recording the notification state then fails
+  (logged as `Inquiry <reference>: notification state not recorded (<error code>)`; the inquiry stays `PENDING` and can
+  be resent).
 - A duplicate submission never sends another email.
 - Sales can retry from the inquiry page ("Gửi lại email thông báo"); each retry is audited.
 - With `INQUIRY_NOTIFY_EMAIL_ENABLED` unset the status is `SKIPPED`; the inbox is still the record.
@@ -146,7 +165,7 @@ never the buyer's email, phone, company or notes.
 | `INQUIRY_NOTIFY_TO` | when email on | Comma-separated recipients. |
 | `INQUIRY_NOTIFY_FROM` | when email on | A sender the SMTP provider allows (SPF/DKIM on that domain). |
 | `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_SECURE` (`true` for 465), `SMTP_USER`, `SMTP_PASS` | when email on | |
-| `CMS_PUBLIC_URL` | when email on | CMS frontend URL for the email link; must be https in production. |
+| `CMS_PUBLIC_URL` | when email on | CMS frontend URL for the email link. In production it must parse as an `https:` URL with a host (`https://` alone is refused); it is stored without a trailing slash. |
 
 Rotate the secret by setting the new value on the CMS and the website together; requests signed with the old value
 get 401 in between, and the website shows its retry/email fallback.
@@ -154,7 +173,9 @@ get 401 in between, and the website shows its retry/email fallback.
 ## Sales workflow
 
 1. A new inquiry appears in **Sales → Yêu cầu giao thương** (the list re-polls every 30 s while the tab is open) and,
-   if enabled, in the notification mailbox.
+   if enabled, in the notification mailbox. Times are shown in Vietnam time (Asia/Ho_Chi_Minh, UTC+7), and a date
+   filter selects that Vietnam calendar day (`2026-11-12` = `2026-11-11T17:00Z` up to, not including,
+   `2026-11-12T17:00Z`).
 2. Open it, assign it, contact the buyer: **Gửi email cho người mua** (mailto with the reference), **Sao chép số điện
    thoại**, or **Mở WhatsApp** (only for numbers given with a country code). Nothing is sent automatically.
 3. Move the status as the deal progresses; record calls and agreements as notes.

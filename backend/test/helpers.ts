@@ -24,6 +24,7 @@ export async function setupApp(
   ).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     bodyParser: false,
+    rawBody: true,
     logger: ['error'],
   });
   configureApp(app);

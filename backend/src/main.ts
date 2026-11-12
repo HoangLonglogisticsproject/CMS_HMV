@@ -8,6 +8,7 @@ import { APP_CONFIG, type AppConfig } from './config';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
+    rawBody: true, // req.rawBody for the signed trade inquiry ingestion (app.setup.ts)
   });
   configureApp(app);
   const config = app.get<AppConfig>(APP_CONFIG);

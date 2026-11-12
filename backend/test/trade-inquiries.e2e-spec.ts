@@ -1,7 +1,10 @@
 import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { INQUIRY_NOTIFIER } from '../src/modules/trade-inquiries/inquiry-notifier';
+import {
+  INQUIRY_NOTIFIER,
+  type InquiryNotifier,
+} from '../src/modules/trade-inquiries/inquiry-notifier';
 import { REFERENCE } from '../src/modules/trade-inquiries/inquiry-reference';
 import { signIngestRequest } from '../src/modules/trade-inquiries/inquiry-signature';
 import {
@@ -44,21 +47,32 @@ const cassava = (over: object = {}) => ({
 describe('Trade inquiries (PostgreSQL)', () => {
   let t: TestApp;
   let sales: Session;
-  const notifier = { enabled: true, send: vi.fn(async () => {}) };
+  const notifier = {
+    enabled: true,
+    send: vi.fn<InquiryNotifier['send']>(async () => {}),
+  };
 
-  /** A signed ingestion request, as the website sends it. */
+  /**
+   * A signed ingestion request, as the website sends it: the body serialized once, that exact string signed and sent.
+   * `sent` replaces the transmitted body after signing (a tampered request).
+   */
   const ingest = (
-    body: object,
+    body: unknown,
     key: string = randomUUID(),
-    opts: { secret?: string; timestamp?: number } = {},
+    opts: { secret?: string; timestamp?: number; sent?: string } = {},
   ) => {
     const ts = String(opts.timestamp ?? Math.floor(Date.now() / 1000));
+    const raw = JSON.stringify(body);
     return request(t.http)
       .post(INGEST)
+      .set('Content-Type', 'application/json')
       .set('X-HMV-Timestamp', ts)
-      .set('X-HMV-Signature', signIngestRequest(opts.secret ?? SECRET, ts, key))
+      .set(
+        'X-HMV-Signature',
+        signIngestRequest(opts.secret ?? SECRET, ts, key, raw),
+      )
       .set('Idempotency-Key', key)
-      .send(body);
+      .send(opts.sent ?? raw);
   };
   const row = (reference: string) =>
     t.prisma.tradeInquiry.findUniqueOrThrow({ where: { reference } });
@@ -154,7 +168,9 @@ describe('Trade inquiries (PostgreSQL)', () => {
       const burst = await Promise.all(
         [1, 2, 3].map(() => ingest(cassava(), 'burst-key-0001')),
       );
-      expect(burst.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 200, 201]);
+      expect(burst.map((r) => r.status).sort((a, b) => a - b)).toEqual([
+        200, 200, 201,
+      ]);
       expect(new Set(burst.map((r) => r.body.reference)).size).toBe(1);
       expect(await t.prisma.tradeInquiry.count()).toBe(2);
       expect(notifier.send).toHaveBeenCalledTimes(2);
@@ -171,6 +187,18 @@ describe('Trade inquiries (PostgreSQL)', () => {
       }).expect(401);
       const badKey = await ingest(cassava(), 'bad key!').expect(400);
       expect(badKey.body.code).toBe('VALIDATION_FAILED');
+      // The body is signed: valid headers replayed with another body are refused, even a byte-different equal JSON.
+      const tampered = await ingest(cassava(), randomUUID(), {
+        sent: JSON.stringify(
+          cassava({
+            contact: { company: 'Attacker', email: 'a@evil.example' },
+          }),
+        ),
+      }).expect(401);
+      expect(tampered.body.code).toBe('SIGNATURE_INVALID');
+      await ingest(cassava(), randomUUID(), {
+        sent: JSON.stringify(cassava(), null, 2),
+      }).expect(401);
       // A CMS session is not an ingestion credential.
       await sales.post(INGEST, cassava()).expect(401);
       expect(await t.prisma.tradeInquiry.count()).toBe(0);
@@ -198,11 +226,38 @@ describe('Trade inquiries (PostgreSQL)', () => {
         cassava({ goal: 'customs', productId: null, goods: '' }),
         cassava({ consentAt: 'yesterday' }),
         cassava({ website: 'http://spam' }),
+        // Inherited names are never contract keys or options (a 400, not a 500).
+        cassava({ productId: '__proto__' }),
+        cassava({ productId: 'constructor' }),
+        cassava({ productId: 'unknown-product' }),
+        cassava({ requirements: { incoterm: '__proto__' } }),
+        cassava({ requirements: { incoterm: 'constructor' } }),
+        cassava({ requirements: { incoterm: 'toString' } }),
+        cassava({
+          goal: 'customs',
+          productId: null,
+          goods: 'Samples',
+          requirements: { service: '__proto__' },
+        }),
+        cassava({ origin: '__proto__' }),
+        cassava({ application: 'constructor' }),
+        cassava({ transport: '__proto__' }),
+        cassava({ volume: { amount: '5', unit: 'constructor' } }),
+        // contact, volume and source must be objects.
+        cassava({ contact: [] }),
+        cassava({ contact: null }),
+        cassava({ contact: 'x' }),
+        cassava({ volume: [] }),
+        cassava({ source: 'x' }),
       ];
       for (const body of refused) {
         const res = await ingest(body);
         expect(res.status, JSON.stringify(body).slice(0, 120)).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_FAILED');
       }
+      // A JSON body that is not an object at all.
+      for (const body of [null, [], 'x'])
+        expect((await ingest(body)).status).toBe(400);
       expect(await t.prisma.tradeInquiry.count()).toBe(0);
     });
 
@@ -240,6 +295,52 @@ describe('Trade inquiries (PostgreSQL)', () => {
         'inquiry.create',
         'inquiry.notification_retry',
       ]);
+    });
+
+    it('an email over the time budget is cancelled: FAILED (ETIMEOUT), the send saw the abort, the inquiry is accepted', async () => {
+      const warn = vi.spyOn(Logger.prototype, 'warn');
+      const aborted: boolean[] = [];
+      notifier.send.mockImplementationOnce(
+        (_m, signal) =>
+          new Promise<void>((_, reject) =>
+            signal.addEventListener('abort', () => {
+              aborted.push(true);
+              reject(Object.assign(new Error('aborted'), { code: 'EABORT' }));
+            }),
+          ),
+      );
+      const res = await ingest(cassava()).expect(201);
+      expect(aborted).toEqual([true]);
+      expect(await row(res.body.reference)).toMatchObject({
+        notificationStatus: 'FAILED',
+        notificationAttempts: 1,
+      });
+      expect(warn.mock.calls.flat().join(' ')).toContain('(ETIMEOUT)');
+      warn.mockRestore();
+    }, 10_000);
+
+    it('a failure recording the notification after the inquiry is committed still accepts the inquiry', async () => {
+      const error = vi.spyOn(Logger.prototype, 'error');
+      const update = vi
+        .spyOn(t.prisma.tradeInquiry, 'update')
+        .mockRejectedValueOnce(
+          Object.assign(new Error('connection lost for buyer@example.com'), {
+            code: 'P1001',
+          }),
+        );
+      try {
+        const res = await ingest(cassava()).expect(201);
+        expect(res.body.duplicate).toBe(false);
+        const saved = await row(res.body.reference);
+        expect(saved.notificationStatus).toBe('PENDING');
+        const logged = error.mock.calls.flat().join(' ');
+        expect(logged).toContain(`Inquiry ${saved.reference}`);
+        expect(logged).toContain('(P1001)');
+        expect(logged).not.toMatch(/buyer@example|Feed Co/);
+      } finally {
+        update.mockRestore();
+        error.mockRestore();
+      }
     });
 
     it('with notification email disabled the inquiry is saved and marked SKIPPED', async () => {
@@ -340,9 +441,39 @@ describe('Trade inquiries (PostgreSQL)', () => {
         cas.reference,
       ]);
       expect(await refs('unassigned=true')).toHaveLength(2);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = new Date(Date.now() + 7 * 3_600_000) // the Vietnam calendar day
+        .toISOString()
+        .slice(0, 10);
       expect(await refs(`dateFrom=${today}&dateTo=${today}`)).toHaveLength(3);
       expect(await refs('dateTo=2020-01-01')).toHaveLength(0);
+      expect(
+        (await sales.get(`${ADMIN}?dateFrom=2026-W46`).expect(400)).body.code,
+      ).toBe('VALIDATION_FAILED');
+    });
+
+    it('a filter date is a Vietnam calendar day (UTC+7), whatever the server time zone', async () => {
+      const [a, b, c] = await seed();
+      const at = (inquiry: { id: string }, iso: string) =>
+        t.prisma.tradeInquiry.update({
+          where: { id: inquiry.id },
+          data: { createdAt: new Date(iso) },
+        });
+      await at(a, '2026-11-11T16:59:59Z'); // 2026-11-11 23:59:59 in Vietnam
+      await at(b, '2026-11-11T17:00:00Z'); // 2026-11-12 00:00:00
+      await at(c, '2026-11-12T17:00:00Z'); // 2026-11-13 00:00:00: outside
+      const refs = async (query: string) =>
+        (await sales.get(`${ADMIN}?${query}`).expect(200)).body.items
+          .map((i: { reference: string }) => i.reference)
+          .sort();
+      expect(await refs('dateFrom=2026-11-12&dateTo=2026-11-12')).toEqual([
+        b.reference,
+      ]);
+      expect(await refs('dateTo=2026-11-11')).toEqual([a.reference]);
+      expect(await refs('dateFrom=2026-11-13')).toEqual([c.reference]);
+      // An explicit offset is an instant.
+      expect(
+        await refs('dateFrom=2026-11-11T17:00:00Z&dateTo=2026-11-11T17:00:01Z'),
+      ).toEqual([b.reference]);
     });
 
     it('stats count by status, today and the last 7 days', async () => {
@@ -401,6 +532,12 @@ describe('Trade inquiries (PostgreSQL)', () => {
         .patch(`${ADMIN}/${cas.id}`, { assignedToId: null })
         .expect(200);
       await sales.patch(`${ADMIN}/${cas.id}`, {}).expect(400);
+      // status is optional only when omitted: null never reaches the database.
+      const nullStatus = await sales
+        .patch(`${ADMIN}/${cas.id}`, { status: null })
+        .expect(400);
+      expect(nullStatus.body.code).toBe('VALIDATION_FAILED');
+      expect((await row(cas.reference)).status).toBe('QUALIFIED');
       // The buyer's brief cannot be edited.
       await sales
         .patch(`${ADMIN}/${cas.id}`, { company: 'Changed' })

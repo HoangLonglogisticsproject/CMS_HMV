@@ -3693,7 +3693,7 @@ export interface operations {
             header: {
                 /** @description 8-64 letters, digits or hyphens */
                 "Idempotency-Key": string;
-                /** @description hex HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>") */
+                /** @description hex HMAC-SHA256(secret, "<timestamp>.<idempotencyKey>.<hex SHA-256 of the exact request body>") */
                 "X-HMV-Signature": string;
                 /** @description Unix time in seconds (±5 minutes) */
                 "X-HMV-Timestamp": string;
@@ -3766,9 +3766,9 @@ export interface operations {
                 assignedToId?: string;
                 /** @description Only inquiries with nobody assigned. */
                 unassigned?: boolean;
-                /** @description Received on or after (ISO date or date-time). */
+                /** @description Received on or after: a date is 00:00 of that Vietnam day; a date-time without an offset is Vietnam time. */
                 dateFrom?: string;
-                /** @description Received before the end of this day (ISO date) or this instant (date-time). */
+                /** @description Received before the end of this Vietnam day (date), or before this instant (date-time). */
                 dateTo?: string;
                 utmSource?: string;
                 /** @description Reference, company, email, contact name, product or destination (case-insensitive). */

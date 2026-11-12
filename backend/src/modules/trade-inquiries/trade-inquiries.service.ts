@@ -16,6 +16,7 @@ import {
   type StoredRequirement,
   TRANSPORT,
   VOLUME_UNITS,
+  lookup,
   requirementsFor,
 } from './inquiry-contract';
 import {
@@ -23,7 +24,7 @@ import {
   type InquiryNotifier,
   NOTIFY_TIMEOUT_MS,
   buildInquiryEmail,
-  withTimeout,
+  sendWithin,
 } from './inquiry-notifier';
 import { createReference } from './inquiry-reference';
 import type {
@@ -85,7 +86,11 @@ function uniqueTarget(err: unknown): string | null {
   return typeof target === 'string' ? target : '';
 }
 
-/** 00:00 today in Vietnam (UTC+7), where the commercial team works, as an instant. */
+/** The inbox's one time zone: Vietnam (Asia/Ho_Chi_Minh, UTC+7 all year, no daylight saving time). */
+const VIETNAM_OFFSET = '+07:00';
+const DAY_MS = 86_400_000;
+
+/** 00:00 today in Vietnam, where the commercial team works, as an instant. */
 function startOfVietnamDay(now: Date) {
   const vn = new Date(now.getTime() + 7 * 3_600_000);
   return new Date(
@@ -94,11 +99,39 @@ function startOfVietnamDay(now: Date) {
   );
 }
 
-/** End of a `dateTo` filter: the whole day for a plain date, the instant otherwise. */
-const dateToBound = (value: string) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(new Date(`${value}T00:00:00Z`).getTime() + 86_400_000)
-    : new Date(value);
+/**
+ * A `dateFrom`/`dateTo` filter value as an instant. A plain date is a Vietnam calendar day: `from` is its 00:00, `to`
+ * the next day's 00:00 (exclusive), so the day the inbox shows is the day filtered. A date-time without an offset is
+ * Vietnam time too; one with an offset (or Z) is already an instant. Never the server's or the browser's zone.
+ */
+export function vietnamBound(value: string, side: 'from' | 'to'): Date {
+  const plainDate = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const instant = new Date(
+    plainDate
+      ? `${value}T00:00:00${VIETNAM_OFFSET}`
+      : zoned
+        ? value
+        : `${value}${VIETNAM_OFFSET}`,
+  );
+  if (Number.isNaN(instant.getTime()))
+    throw invalid([
+      {
+        path: side === 'from' ? 'dateFrom' : 'dateTo',
+        message: 'not a valid date',
+      },
+    ]);
+  return plainDate && side === 'to'
+    ? new Date(instant.getTime() + DAY_MS)
+    : instant;
+}
+
+/** A safe reason for logs: an error code or the error's class, never its message (SMTP replies can echo addresses). */
+function errorReason(err: unknown) {
+  const code = (err as { code?: unknown })?.code;
+  if (typeof code === 'string' || typeof code === 'number') return String(code);
+  return err instanceof Error ? err.name : 'Error';
+}
 
 @Injectable()
 export class TradeInquiriesService {
@@ -117,7 +150,7 @@ export class TradeInquiriesService {
     const issues: Issue[] = [];
     const goal = dto.goal as InquiryGoal;
     const sourcing = goal === 'sourcing';
-    const product = sourcing ? PRODUCTS[dto.productId ?? ''] : undefined;
+    const product = sourcing ? lookup(PRODUCTS, dto.productId) : undefined;
     if (sourcing && !product)
       issues.push({
         path: 'productId',
@@ -141,16 +174,19 @@ export class TradeInquiriesService {
           path: 'origin',
           message: 'origin is not offered for this product',
         });
-      origin = ORIGINS[origin ?? product.origins[0]];
+      origin = lookup(ORIGINS, origin ?? product.origins[0]) ?? null;
     }
     const unit = dto.volume?.unit ?? 'containers';
-    if (!VOLUME_UNITS[unit])
+    const unitLabel = lookup(VOLUME_UNITS, unit);
+    if (!unitLabel)
       issues.push({ path: 'volume.unit', message: 'unknown volume unit' });
     const application = empty(dto.application);
-    if (application && !product?.applications?.[application])
+    const applicationLabel = lookup(product?.applications, application);
+    if (application && !applicationLabel)
       issues.push({ path: 'application', message: 'unknown application' });
     const transport = empty(dto.transport);
-    if (transport && !TRANSPORT[transport])
+    const transportLabel = lookup(TRANSPORT, transport);
+    if (transport && !transportLabel)
       issues.push({ path: 'transport', message: 'unknown transport' });
 
     const rules = requirementsFor(goal, dto.productId);
@@ -168,13 +204,13 @@ export class TradeInquiriesService {
           path: `requirements.${key}`,
           message: 'must be a string of at most 200 characters',
         });
-      else if (rule.options && !rule.options[value])
+      else if (rule.options && !lookup(rule.options, value))
         issues.push({ path: `requirements.${key}`, message: 'unknown option' });
       else if (value)
         requirements.push({
           key,
           label: rule.label,
-          value: rule.options ? rule.options[value] : value,
+          value: rule.options ? lookup(rule.options, value)! : value,
         });
     }
     if (issues.length) throw invalid(issues);
@@ -195,9 +231,9 @@ export class TradeInquiriesService {
       origin,
       destination: empty(dto.destination),
       volumeAmount: amount,
-      volumeUnit: amount ? VOLUME_UNITS[unit] : null,
-      application: application ? product!.applications![application] : null,
-      transport: transport ? TRANSPORT[transport] : null,
+      volumeUnit: amount ? unitLabel! : null,
+      application: applicationLabel ?? null,
+      transport: transportLabel ?? null,
       requirements: requirements as unknown as Prisma.InputJsonArray,
       buyerNotes: empty(dto.notes),
       company: dto.contact.company.trim(),
@@ -216,6 +252,8 @@ export class TradeInquiriesService {
   /**
    * One inquiry per idempotency key. A new key creates it (and notifies once); a known key returns the existing
    * reference with `duplicate: true` and sends nothing. The unique column settles concurrent duplicates.
+   * Once the inquiry is committed the answer is success: a notification failure after that (sending, or recording
+   * its state) is logged and left to the sales inbox's resend, never reported as a failed submission.
    */
   async ingest(
     dto: IngestTradeInquiryDto,
@@ -230,9 +268,10 @@ export class TradeInquiriesService {
     const known = await existing();
     if (known) return { reference: known.reference, duplicate: true };
 
+    let inquiry: { id: string; reference: string };
     for (let attempt = 0; ; attempt++) {
       try {
-        const inquiry = await this.prisma.$transaction(async (tx) => {
+        inquiry = await this.prisma.$transaction(async (tx) => {
           const created = await tx.tradeInquiry.create({
             data: { ...data, idempotencyKey, reference: createReference() },
           });
@@ -244,8 +283,7 @@ export class TradeInquiriesService {
           });
           return created;
         });
-        await this.notify(inquiry.id);
-        return { reference: inquiry.reference, duplicate: false };
+        break;
       } catch (err) {
         const target = uniqueTarget(err);
         if (target?.includes('idempotencyKey')) {
@@ -256,11 +294,23 @@ export class TradeInquiriesService {
         throw err;
       }
     }
+
+    try {
+      await this.notify(inquiry.id);
+    } catch (err) {
+      this.logger.error(
+        `Inquiry ${inquiry.reference}: notification state not recorded (${errorReason(err)})`,
+      );
+    }
+    return { reference: inquiry.reference, duplicate: false };
   }
 
   // ---------- Notification ----------
 
-  /** Attempts the new-inquiry email within the time budget and records the outcome. Never throws. */
+  /**
+   * Attempts the new-inquiry email within the time budget and records the outcome. A failed or timed-out send is a
+   * FAILED outcome, not an error; only recording the outcome can throw (the caller decides what that means).
+   */
   private async notify(id: string): Promise<InquiryNotificationStatus> {
     if (!this.notifier.enabled) {
       await this.prisma.tradeInquiry.update({
@@ -282,19 +332,13 @@ export class TradeInquiriesService {
         },
         this.config.tradeInquiries.cmsPublicUrl,
       );
-      await withTimeout(this.notifier.send(message), NOTIFY_TIMEOUT_MS);
+      // Cancelled, not abandoned, at the budget: when this reports FAILED no send is still running.
+      await sendWithin(this.notifier, message, NOTIFY_TIMEOUT_MS);
     } catch (err) {
       status = 'FAILED';
       // The reference and an error code only: SMTP replies can echo addresses, and credentials must never reach logs.
-      const code = (err as { code?: unknown })?.code;
-      const reason =
-        typeof code === 'string' || typeof code === 'number'
-          ? String(code)
-          : err instanceof Error
-            ? err.name
-            : 'Error';
       this.logger.warn(
-        `Inquiry ${inquiry.reference}: notification email failed (${reason})`,
+        `Inquiry ${inquiry.reference}: notification email failed (${errorReason(err)})`,
       );
     }
     await this.prisma.tradeInquiry.update({
@@ -343,8 +387,8 @@ export class TradeInquiriesService {
       createdAt:
         q.dateFrom || q.dateTo
           ? {
-              gte: q.dateFrom ? new Date(q.dateFrom) : undefined,
-              lt: q.dateTo ? dateToBound(q.dateTo) : undefined,
+              gte: q.dateFrom ? vietnamBound(q.dateFrom, 'from') : undefined,
+              lt: q.dateTo ? vietnamBound(q.dateTo, 'to') : undefined,
             }
           : undefined,
       OR: search

@@ -3,6 +3,7 @@ import { InquiryNotificationStatus, TradeInquiryStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDefined,
   IsIn,
   IsISO8601,
   IsObject,
@@ -28,6 +29,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PATH = /^\/(?!\/)[^?#\s]*$/;
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
 const UTM = /^[\w.+\- ]*$/;
+/** Inbox date filters: YYYY-MM-DD, or a date-time with an optional offset. */
+const FILTER_DATE =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 export class InquiryVolumeDto {
   @IsOptional()
@@ -146,6 +150,7 @@ export class IngestTradeInquiryDto {
   destination?: string;
 
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => InquiryVolumeDto)
   volume?: InquiryVolumeDto;
@@ -171,11 +176,15 @@ export class IngestTradeInquiryDto {
   @MaxLength(2000)
   notes?: string;
 
+  // An object: arrays, null and scalars are refused here, before the service reads its fields.
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => InquiryContactDto)
   contact: InquiryContactDto;
 
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => InquirySourceDto)
   source?: InquirySourceDto;
@@ -228,14 +237,16 @@ export class TradeInquiryListQuery extends PageQuery {
   @IsBoolean()
   unassigned?: boolean;
 
-  /** Received on or after (ISO date or date-time). */
+  /** Received on or after: a date is 00:00 of that Vietnam day; a date-time without an offset is Vietnam time. */
   @IsOptional()
-  @IsISO8601()
+  @IsISO8601({ strict: true })
+  @Matches(FILTER_DATE)
   dateFrom?: string;
 
-  /** Received before the end of this day (ISO date) or this instant (date-time). */
+  /** Received before the end of this Vietnam day (date), or before this instant (date-time). */
   @IsOptional()
-  @IsISO8601()
+  @IsISO8601({ strict: true })
+  @Matches(FILTER_DATE)
   dateTo?: string;
 
   @IsOptional()
@@ -328,7 +339,8 @@ export class TradeInquiryDetailResponse extends TradeInquirySummary {
 
 /** Status and assignment only: the buyer's brief is never edited. `assignedToId: null` unassigns. */
 export class UpdateTradeInquiryDto {
-  @IsOptional()
+  // Optional only when omitted: `status: null` is refused (IsOptional would let null through to Prisma).
+  @ValidateIf((_, v) => v !== undefined)
   @IsIn(Object.values(TradeInquiryStatus))
   @ApiPropertyOptional({
     enum: TradeInquiryStatus,

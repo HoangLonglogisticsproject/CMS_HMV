@@ -3121,7 +3121,7 @@
           {
             "name": "X-HMV-Signature",
             "in": "header",
-            "description": "hex HMAC-SHA256(secret, \"<timestamp>.<idempotencyKey>\")",
+            "description": "hex HMAC-SHA256(secret, \"<timestamp>.<idempotencyKey>.<hex SHA-256 of the exact request body>\")",
             "required": true,
             "schema": {
               "type": "string"
@@ -3293,7 +3293,7 @@
             "name": "dateFrom",
             "required": false,
             "in": "query",
-            "description": "Received on or after (ISO date or date-time).",
+            "description": "Received on or after: a date is 00:00 of that Vietnam day; a date-time without an offset is Vietnam time.",
             "schema": {
               "type": "string"
             }
@@ -3302,7 +3302,7 @@
             "name": "dateTo",
             "required": false,
             "in": "query",
-            "description": "Received before the end of this day (ISO date) or this instant (date-time).",
+            "description": "Received before the end of this Vietnam day (date), or before this instant (date-time).",
             "schema": {
               "type": "string"
             }

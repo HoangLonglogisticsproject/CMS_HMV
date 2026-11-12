@@ -89,6 +89,27 @@ export function whatsAppLink(phone: string | null | undefined): string | null {
   return digits.length >= 8 && digits.length <= 15 ? `https://wa.me/${digits}` : null;
 }
 
+/** The inbox's one time zone: the dates it shows and the day its date filters select (server rule: UTC+7). */
+const vietnamDateTime = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "Asia/Ho_Chi_Minh",
+});
+
+/** ISO timestamp → Vietnam local time, whatever the browser's time zone. */
+export const formatVietnamDateTime = (iso?: string | null) => (iso ? vietnamDateTime.format(new Date(iso)) : "—");
+
+/**
+ * The page to show once a response has settled: back to the last page when the matching total shrank below the
+ * current one (another user's change, a poll). Placeholder data during a filter change is the previous query's, so it
+ * never moves the page.
+ */
+export const settledPage = (page: number, pageCount: number, settled: boolean) =>
+  settled && page > pageCount ? pageCount : page;
+
+/** The note box after a save: cleared only if it still holds the text that was saved, never newer typing. */
+export const noteAfterSave = (current: string, saved: string) => (current === saved ? "" : current);
+
 /** mailto: with a subject naming the reference; the body is left to the salesperson. */
 export const buyerMailto = (email: string, reference: string, subject: string) =>
   `mailto:${email}?subject=${encodeURIComponent(`HMV Global — ${reference} — ${subject}`)}`;
