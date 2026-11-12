@@ -6,6 +6,13 @@ const list = (value?: string) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** `value` without trailing slashes (a loop, not a regex: no backtracking on long runs of '/'). */
+export function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 /** Express `trust proxy`: unset = false, a number = hop count, anything else passed through ("loopback", CIDRs). */
 function trustProxy(value?: string): boolean | number | string {
   if (!value || value === 'false') return false;
@@ -28,7 +35,7 @@ function productionCmsUrl(value: string) {
     throw new Error(
       'CMS_PUBLIC_URL must be an https URL with a host in production',
     );
-  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  return `${url.origin}${trimTrailingSlashes(url.pathname)}`;
 }
 
 /**
@@ -44,9 +51,8 @@ function tradeInquiryConfig(env: NodeJS.ProcessEnv, isProduction: boolean) {
     );
 
   const notifyEnabled = env.INQUIRY_NOTIFY_EMAIL_ENABLED === 'true';
-  const cmsPublicUrl = (env.CMS_PUBLIC_URL ?? 'http://localhost:3000').replace(
-    /\/+$/,
-    '',
+  const cmsPublicUrl = trimTrailingSlashes(
+    env.CMS_PUBLIC_URL ?? 'http://localhost:3000',
   );
   const to = list(env.INQUIRY_NOTIFY_TO);
   if (notifyEnabled) {
@@ -127,9 +133,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     storage: {
       driver: driver as 'local' | 'r2',
       localDir: env.LOCAL_STORAGE_DIR ?? 'storage/media',
-      publicBaseUrl: (
-        env.MEDIA_PUBLIC_BASE_URL ?? `http://localhost:${port}/media-files`
-      ).replace(/\/+$/, ''),
+      publicBaseUrl: trimTrailingSlashes(
+        env.MEDIA_PUBLIC_BASE_URL ?? `http://localhost:${port}/media-files`,
+      ),
       r2: {
         accountId: env.R2_ACCOUNT_ID ?? '',
         accessKeyId: env.R2_ACCESS_KEY_ID ?? '',

@@ -51,6 +51,7 @@ export const ERROR_CODES = [
   'SIGNATURE_INVALID',
   'INQUIRY_NOT_FOUND',
   'ASSIGNEE_INVALID',
+  'NOTIFICATION_IN_PROGRESS',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

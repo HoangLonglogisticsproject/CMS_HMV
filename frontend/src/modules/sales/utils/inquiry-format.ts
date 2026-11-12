@@ -43,7 +43,8 @@ export const PRODUCT_LABEL: Record<string, string> = {
 };
 
 export const NOTIFICATION_LABEL: Record<NotificationStatus, string> = {
-  PENDING: "Đang gửi email",
+  PENDING: "Email thông báo đang chờ gửi",
+  SENDING: "Đang gửi email thông báo",
   SENT: "Đã gửi email thông báo",
   FAILED: "Gửi email thông báo thất bại",
   SKIPPED: "Email thông báo đang tắt",

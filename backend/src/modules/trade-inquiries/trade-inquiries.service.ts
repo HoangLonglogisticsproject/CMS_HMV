@@ -9,16 +9,8 @@ import { pageArgs } from '../../common/dto';
 import { AppError, type Issue } from '../../common/errors';
 import { APP_CONFIG, type AppConfig } from '../../config';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import {
-  type InquiryGoal,
-  ORIGINS,
-  PRODUCTS,
-  type StoredRequirement,
-  TRANSPORT,
-  VOLUME_UNITS,
-  lookup,
-  requirementsFor,
-} from './inquiry-contract';
+import { buildBrief } from './inquiry-brief';
+import type { StoredRequirement } from './inquiry-contract';
 import {
   INQUIRY_NOTIFIER,
   type InquiryNotifier,
@@ -66,10 +58,6 @@ const summarySelect = {
   lastActivityAt: true,
 } satisfies Prisma.TradeInquirySelect;
 
-const empty = (v: string | undefined | null) => {
-  const s = v?.trim();
-  return s ? s : null;
-};
 const invalid = (issues: Issue[]) =>
   new AppError(400, 'VALIDATION_FAILED', 'Request validation failed', issues);
 const notFound = () =>
@@ -106,14 +94,11 @@ function startOfVietnamDay(now: Date) {
  */
 export function vietnamBound(value: string, side: 'from' | 'to'): Date {
   const plainDate = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const zoned = /(Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  const instant = new Date(
-    plainDate
-      ? `${value}T00:00:00${VIETNAM_OFFSET}`
-      : zoned
-        ? value
-        : `${value}${VIETNAM_OFFSET}`,
-  );
+  let iso: string;
+  if (plainDate) iso = `${value}T00:00:00${VIETNAM_OFFSET}`;
+  else if (/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) iso = value;
+  else iso = `${value}${VIETNAM_OFFSET}`;
+  const instant = new Date(iso);
   if (Number.isNaN(instant.getTime()))
     throw invalid([
       {
@@ -121,10 +106,55 @@ export function vietnamBound(value: string, side: 'from' | 'to'): Date {
         message: 'not a valid date',
       },
     ]);
-  return plainDate && side === 'to'
-    ? new Date(instant.getTime() + DAY_MS)
-    : instant;
+  if (plainDate && side === 'to') return new Date(instant.getTime() + DAY_MS);
+  return instant;
 }
+
+/** No word from an attempt for 5 minutes (its budget is 2.5 s): it crashed, and a manual resend may take it over. */
+export const STALE_ATTEMPT_MS = 5 * 60_000;
+
+/**
+ * What a manual resend may claim: a finished attempt (FAILED, SENT, SKIPPED), or one left PENDING or SENDING by a
+ * crash. A PENDING or SENDING notification younger than STALE_ATTEMPT_MS belongs to a running attempt.
+ */
+function manualClaim(now: Date): Prisma.TradeInquiryWhereInput {
+  const stale = new Date(now.getTime() - STALE_ATTEMPT_MS);
+  return {
+    OR: [
+      { notificationStatus: { in: ['FAILED', 'SENT', 'SKIPPED'] } },
+      {
+        notificationStatus: 'SENDING',
+        notificationLastAttemptAt: { lt: stale },
+      },
+      { notificationStatus: 'PENDING', createdAt: { lt: stale } },
+    ],
+  };
+}
+
+/** Whether the sales inbox offers "resend": a failed attempt, or one a crash left behind (see manualClaim). */
+export function notificationRetryable(
+  inquiry: {
+    notificationStatus: InquiryNotificationStatus;
+    notificationLastAttemptAt: Date | null;
+    createdAt: Date;
+  },
+  now: Date,
+): boolean {
+  const staleBefore = now.getTime() - STALE_ATTEMPT_MS;
+  switch (inquiry.notificationStatus) {
+    case 'FAILED':
+      return true;
+    case 'SENDING':
+      return (inquiry.notificationLastAttemptAt?.getTime() ?? 0) < staleBefore;
+    case 'PENDING':
+      return inquiry.createdAt.getTime() < staleBefore;
+    default:
+      return false;
+  }
+}
+
+/** The outcome of a notification request: an attempt's result, or IN_PROGRESS when another attempt holds it. */
+type NotifyResult = 'SENT' | 'FAILED' | 'SKIPPED' | 'IN_PROGRESS';
 
 /** A safe reason for logs: an error code or the error's class, never its message (SMTP replies can echo addresses). */
 function errorReason(err: unknown) {
@@ -145,110 +175,6 @@ export class TradeInquiriesService {
 
   // ---------- Ingestion ----------
 
-  /** The controlled brief: checked against the contract, labelled for the sales team. */
-  private brief(dto: IngestTradeInquiryDto) {
-    const issues: Issue[] = [];
-    const goal = dto.goal as InquiryGoal;
-    const sourcing = goal === 'sourcing';
-    const product = sourcing ? lookup(PRODUCTS, dto.productId) : undefined;
-    if (sourcing && !product)
-      issues.push({
-        path: 'productId',
-        message: 'productId must be a Trade Desk product',
-      });
-    if (!sourcing && dto.productId)
-      issues.push({
-        path: 'productId',
-        message: 'productId is for sourcing inquiries only',
-      });
-    if (!sourcing && !empty(dto.goods))
-      issues.push({
-        path: 'goods',
-        message: 'goods is required for this goal',
-      });
-
-    let origin = empty(dto.origin);
-    if (sourcing && product) {
-      if (origin && !product.origins.includes(origin))
-        issues.push({
-          path: 'origin',
-          message: 'origin is not offered for this product',
-        });
-      origin = lookup(ORIGINS, origin ?? product.origins[0]) ?? null;
-    }
-    const unit = dto.volume?.unit ?? 'containers';
-    const unitLabel = lookup(VOLUME_UNITS, unit);
-    if (!unitLabel)
-      issues.push({ path: 'volume.unit', message: 'unknown volume unit' });
-    const application = empty(dto.application);
-    const applicationLabel = lookup(product?.applications, application);
-    if (application && !applicationLabel)
-      issues.push({ path: 'application', message: 'unknown application' });
-    const transport = empty(dto.transport);
-    const transportLabel = lookup(TRANSPORT, transport);
-    if (transport && !transportLabel)
-      issues.push({ path: 'transport', message: 'unknown transport' });
-
-    const rules = requirementsFor(goal, dto.productId);
-    const requirements: StoredRequirement[] = [];
-    for (const [key, raw] of Object.entries(dto.requirements)) {
-      const rule = rules.find((r) => r.key === key);
-      const value = typeof raw === 'string' ? raw.trim() : null;
-      if (!rule)
-        issues.push({
-          path: `requirements.${key}`,
-          message: 'unknown requirement',
-        });
-      else if (value === null || value.length > 200)
-        issues.push({
-          path: `requirements.${key}`,
-          message: 'must be a string of at most 200 characters',
-        });
-      else if (rule.options && !lookup(rule.options, value))
-        issues.push({ path: `requirements.${key}`, message: 'unknown option' });
-      else if (value)
-        requirements.push({
-          key,
-          label: rule.label,
-          value: rule.options ? lookup(rule.options, value)! : value,
-        });
-    }
-    if (issues.length) throw invalid(issues);
-    // In the contract's order, so every inquiry reads the same way.
-    requirements.sort(
-      (a, b) =>
-        rules.findIndex((r) => r.key === a.key) -
-        rules.findIndex((r) => r.key === b.key),
-    );
-
-    const amount = empty(dto.volume?.amount);
-    return {
-      locale: dto.locale,
-      goal,
-      productId: product ? dto.productId! : null,
-      productName: product?.name ?? null,
-      goods: sourcing ? null : empty(dto.goods),
-      origin,
-      destination: empty(dto.destination),
-      volumeAmount: amount,
-      volumeUnit: amount ? unitLabel! : null,
-      application: applicationLabel ?? null,
-      transport: transportLabel ?? null,
-      requirements: requirements as unknown as Prisma.InputJsonArray,
-      buyerNotes: empty(dto.notes),
-      company: dto.contact.company.trim(),
-      contactName: empty(dto.contact.name),
-      email: dto.contact.email.trim().toLowerCase(),
-      phone: empty(dto.contact.phone),
-      landingPage: empty(dto.source?.landingPage),
-      referrerOrigin: empty(dto.source?.referrer),
-      utmSource: empty(dto.source?.utm?.source),
-      utmMedium: empty(dto.source?.utm?.medium),
-      utmCampaign: empty(dto.source?.utm?.campaign),
-      contactConsentAt: new Date(dto.consentAt),
-    };
-  }
-
   /**
    * One inquiry per idempotency key. A new key creates it (and notifies once); a known key returns the existing
    * reference with `duplicate: true` and sends nothing. The unique column settles concurrent duplicates.
@@ -259,44 +185,15 @@ export class TradeInquiriesService {
     dto: IngestTradeInquiryDto,
     idempotencyKey: string,
   ): Promise<IngestTradeInquiryResponse> {
-    const data = this.brief(dto);
-    const existing = () =>
-      this.prisma.tradeInquiry.findUnique({
-        where: { idempotencyKey },
-        select: { reference: true },
-      });
-    const known = await existing();
+    const data = buildBrief(dto);
+    const known = await this.byIdempotencyKey(idempotencyKey);
     if (known) return { reference: known.reference, duplicate: true };
 
-    let inquiry: { id: string; reference: string };
-    for (let attempt = 0; ; attempt++) {
-      try {
-        inquiry = await this.prisma.$transaction(async (tx) => {
-          const created = await tx.tradeInquiry.create({
-            data: { ...data, idempotencyKey, reference: createReference() },
-          });
-          await audit(tx, {}, 'inquiry.create', ENTITY, created.id, {
-            reference: created.reference,
-            status: created.status,
-            goal: created.goal,
-            productId: created.productId,
-          });
-          return created;
-        });
-        break;
-      } catch (err) {
-        const target = uniqueTarget(err);
-        if (target?.includes('idempotencyKey')) {
-          const winner = await existing();
-          if (winner) return { reference: winner.reference, duplicate: true };
-        }
-        if (target?.includes('reference') && attempt < 4) continue; // reference collision: draw again
-        throw err;
-      }
-    }
+    const inquiry = await this.create(data, idempotencyKey);
+    if ('duplicate' in inquiry) return inquiry;
 
     try {
-      await this.notify(inquiry.id);
+      await this.notify(inquiry.id, 'initial');
     } catch (err) {
       this.logger.error(
         `Inquiry ${inquiry.reference}: notification state not recorded (${errorReason(err)})`,
@@ -305,25 +202,100 @@ export class TradeInquiriesService {
     return { reference: inquiry.reference, duplicate: false };
   }
 
+  private byIdempotencyKey(idempotencyKey: string) {
+    return this.prisma.tradeInquiry.findUnique({
+      where: { idempotencyKey },
+      select: { reference: true },
+    });
+  }
+
+  /**
+   * Creates the inquiry and its audit row. A reference collision draws a new reference (up to 4 more times); losing a
+   * race on the idempotency key returns the winner's reference as a duplicate.
+   */
+  private async create(
+    data: ReturnType<typeof buildBrief>,
+    idempotencyKey: string,
+    attempt = 0,
+  ): Promise<{ id: string; reference: string } | IngestTradeInquiryResponse> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const created = await tx.tradeInquiry.create({
+          data: { ...data, idempotencyKey, reference: createReference() },
+        });
+        await audit(tx, {}, 'inquiry.create', ENTITY, created.id, {
+          reference: created.reference,
+          status: created.status,
+          goal: created.goal,
+          productId: created.productId,
+        });
+        return created;
+      });
+    } catch (err) {
+      const target = uniqueTarget(err);
+      const winner = target?.includes('idempotencyKey')
+        ? await this.byIdempotencyKey(idempotencyKey)
+        : null;
+      if (winner) return { reference: winner.reference, duplicate: true };
+      if (target?.includes('reference') && attempt < 4)
+        return this.create(data, idempotencyKey, attempt + 1);
+      throw err;
+    }
+  }
+
   // ---------- Notification ----------
 
   /**
-   * Attempts the new-inquiry email within the time budget and records the outcome. A failed or timed-out send is a
-   * FAILED outcome, not an error; only recording the outcome can throw (the caller decides what that means).
+   * One notification attempt, claimed in PostgreSQL so that one inquiry is never emailed by two attempts at once, on
+   * any number of API instances: a single conditional update moves the notification to SENDING and counts the attempt;
+   * only the caller whose update matched (count 1) sends. The initial attempt claims PENDING; a manual resend claims
+   * what manualClaim() allows. The attempt number is the claim's token: the result is written only while the
+   * notification is still SENDING under that number, so an attempt that was taken over can never overwrite a newer one.
+   * A failed or timed-out send is a FAILED result, not an error; only the database can throw.
    */
-  private async notify(id: string): Promise<InquiryNotificationStatus> {
+  private async notify(
+    id: string,
+    mode: 'initial' | 'manual',
+  ): Promise<NotifyResult> {
+    const now = new Date();
+    const claimable: Prisma.TradeInquiryWhereInput =
+      mode === 'initial' ? { notificationStatus: 'PENDING' } : manualClaim(now);
     if (!this.notifier.enabled) {
-      await this.prisma.tradeInquiry.update({
-        where: { id },
+      const skipped = await this.prisma.tradeInquiry.updateMany({
+        where: { id, ...claimable },
         data: { notificationStatus: 'SKIPPED' },
       });
-      return 'SKIPPED';
+      return skipped.count === 1 ? 'SKIPPED' : 'IN_PROGRESS';
     }
+    const claim = await this.prisma.tradeInquiry.updateMany({
+      where: { id, ...claimable },
+      data: {
+        notificationStatus: 'SENDING',
+        notificationAttempts: { increment: 1 },
+        notificationLastAttemptAt: now,
+      },
+    });
+    if (claim.count !== 1) return 'IN_PROGRESS';
+    // Read after the claim: SENDING with a fresh timestamp cannot be claimed again, so this is our attempt's number.
     const inquiry = await this.prisma.tradeInquiry.findUniqueOrThrow({
       where: { id },
     });
-    const attemptedAt = new Date();
-    let status: InquiryNotificationStatus = 'SENT';
+    const result = await this.attempt(inquiry);
+    await this.prisma.tradeInquiry.updateMany({
+      where: {
+        id,
+        notificationStatus: 'SENDING',
+        notificationAttempts: inquiry.notificationAttempts,
+      },
+      data: { notificationStatus: result },
+    });
+    return result;
+  }
+
+  /** Sends the new-inquiry email within the time budget: SENT, or FAILED (logged with the reference and a code). */
+  private async attempt(
+    inquiry: Prisma.TradeInquiryGetPayload<object>,
+  ): Promise<'SENT' | 'FAILED'> {
     try {
       const message = buildInquiryEmail(
         {
@@ -334,24 +306,21 @@ export class TradeInquiriesService {
       );
       // Cancelled, not abandoned, at the budget: when this reports FAILED no send is still running.
       await sendWithin(this.notifier, message, NOTIFY_TIMEOUT_MS);
+      return 'SENT';
     } catch (err) {
-      status = 'FAILED';
       // The reference and an error code only: SMTP replies can echo addresses, and credentials must never reach logs.
       this.logger.warn(
         `Inquiry ${inquiry.reference}: notification email failed (${errorReason(err)})`,
       );
+      return 'FAILED';
     }
-    await this.prisma.tradeInquiry.update({
-      where: { id },
-      data: {
-        notificationStatus: status,
-        notificationAttempts: { increment: 1 },
-        notificationLastAttemptAt: attemptedAt,
-      },
-    });
-    return status;
   }
 
+  /**
+   * A manual resend from the sales inbox. While another attempt holds the notification (SENDING, or the initial
+   * attempt still PENDING) nothing is sent: 409 NOTIFICATION_IN_PROGRESS, and no audit entry. Each attempt that
+   * actually ran is audited.
+   */
   async resendNotification(
     id: string,
     actor: Actor,
@@ -361,7 +330,13 @@ export class TradeInquiriesService {
       select: { reference: true },
     });
     if (!inquiry) throw notFound();
-    const result = await this.notify(id);
+    const result = await this.notify(id, 'manual');
+    if (result === 'IN_PROGRESS')
+      throw new AppError(
+        409,
+        'NOTIFICATION_IN_PROGRESS',
+        'A notification attempt for this inquiry is already running',
+      );
     await audit(this.prisma, actor, 'inquiry.notification_retry', ENTITY, id, {
       reference: inquiry.reference,
       result,
@@ -469,6 +444,7 @@ export class TradeInquiriesService {
     return {
       ...rest,
       requirements: inquiry.requirements as unknown as StoredRequirement[],
+      notificationRetryable: notificationRetryable(inquiry, new Date()),
     };
   }
 

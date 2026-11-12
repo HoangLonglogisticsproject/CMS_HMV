@@ -572,6 +572,7 @@ enum TradeInquiryStatus {
 /// Email notification to the commercial team. SKIPPED: notification email is disabled.
 enum InquiryNotificationStatus {
   PENDING
+  SENDING
   SENT
   FAILED
   SKIPPED

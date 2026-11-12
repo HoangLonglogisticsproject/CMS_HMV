@@ -13,8 +13,10 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateBy,
   ValidateIf,
   ValidateNested,
+  isISO8601,
 } from 'class-validator';
 import { PageMeta, PageQuery, UserRef } from '../../common/dto';
 import { INQUIRY_GOALS, INQUIRY_LOCALES } from './inquiry-contract';
@@ -29,16 +31,31 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PATH = /^\/(?!\/)[^?#\s]*$/;
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
 const UTM = /^[\w.+\- ]*$/;
-/** Inbox date filters: YYYY-MM-DD, or a date-time with an optional offset. */
-const FILTER_DATE =
-  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/;
+
+// Inbox date filters: a plain date, or a date-time to the minute at least. The shape is checked by two small prefixes,
+// the rest by class-validator's strict ISO 8601 check (real calendar dates, offsets): no week, ordinal or month dates.
+const PLAIN_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_TIME_START = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+export const isFilterDate = (value: unknown) =>
+  typeof value === 'string' &&
+  (PLAIN_DATE.test(value) || DATE_TIME_START.test(value)) &&
+  isISO8601(value, { strict: true });
+const IsFilterDate = () =>
+  ValidateBy({
+    name: 'isFilterDate',
+    validator: {
+      validate: isFilterDate,
+      defaultMessage: () =>
+        '$property must be a date (YYYY-MM-DD) or an ISO 8601 date-time',
+    },
+  });
 
 export class InquiryVolumeDto {
   @IsOptional()
   @IsString()
   @Transform(trim)
   @MaxLength(20)
-  @Matches(/^([0-9][0-9.,\s]*)?$/)
+  @Matches(/^(\d[\d.,\s]*)?$/)
   amount?: string;
 
   @IsOptional()
@@ -70,7 +87,7 @@ export class InquiryContactDto {
   @IsString()
   @Transform(trim)
   @MaxLength(40)
-  @Matches(/^[+0-9()\s.-]*$/)
+  @Matches(/^[+\d()\s.-]*$/)
   phone?: string;
 }
 
@@ -239,14 +256,12 @@ export class TradeInquiryListQuery extends PageQuery {
 
   /** Received on or after: a date is 00:00 of that Vietnam day; a date-time without an offset is Vietnam time. */
   @IsOptional()
-  @IsISO8601({ strict: true })
-  @Matches(FILTER_DATE)
+  @IsFilterDate()
   dateFrom?: string;
 
   /** Received before the end of this Vietnam day (date), or before this instant (date-time). */
   @IsOptional()
-  @IsISO8601({ strict: true })
-  @Matches(FILTER_DATE)
+  @IsFilterDate()
   dateTo?: string;
 
   @IsOptional()
@@ -334,6 +349,8 @@ export class TradeInquiryDetailResponse extends TradeInquirySummary {
   updatedAt: Date;
   notificationAttempts: number;
   notificationLastAttemptAt: Date | null;
+  /** Whether the inbox offers "resend": a failed attempt, or one a crash left PENDING or SENDING for 5 minutes. */
+  notificationRetryable: boolean;
   notes: TradeInquiryNoteResponse[];
 }
 

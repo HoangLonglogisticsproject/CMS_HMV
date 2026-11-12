@@ -703,7 +703,7 @@ export interface components {
             expiresAt: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "PAGE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_NOT_SUBMITTED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN" | "INTEGRATION_DISABLED" | "SIGNATURE_INVALID" | "INQUIRY_NOT_FOUND" | "ASSIGNEE_INVALID";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHENTICATED" | "INVALID_CREDENTIALS" | "PERMISSION_DENIED" | "CSRF_TOKEN_INVALID" | "ORIGIN_NOT_ALLOWED" | "RATE_LIMITED" | "NOT_FOUND" | "ARTICLE_NOT_FOUND" | "PAGE_NOT_FOUND" | "TRANSLATION_NOT_FOUND" | "MEDIA_NOT_FOUND" | "CONFLICT" | "REVISION_CONFLICT" | "SLUG_TAKEN" | "ARTICLE_ARCHIVED" | "ARTICLE_NOT_ARCHIVED" | "TRANSLATION_NOT_APPROVED" | "TRANSLATION_NOT_SUBMITTED" | "TRANSLATION_INCOMPLETE" | "RICH_CONTENT_INVALID" | "UNKNOWN_LOCALE" | "UNKNOWN_CATEGORY" | "REFERENCE_INVALID" | "FILE_REQUIRED" | "FILE_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "PAYLOAD_TOO_LARGE" | "INTERNAL_ERROR" | "CURRENT_PASSWORD_INCORRECT" | "USER_NOT_FOUND" | "EMAIL_TAKEN" | "UNKNOWN_ROLE" | "LAST_ADMIN" | "INTEGRATION_DISABLED" | "SIGNATURE_INVALID" | "INQUIRY_NOT_FOUND" | "ASSIGNEE_INVALID" | "NOTIFICATION_IN_PROGRESS";
         ErrorResponse: {
             /** @example 409 */
             statusCode: number;
@@ -1338,7 +1338,7 @@ export interface components {
         /** @enum {string} */
         TradeInquiryStatus: "NEW" | "CONTACTED" | "QUALIFIED" | "QUOTED" | "WON" | "LOST";
         /** @enum {string} */
-        InquiryNotificationStatus: "PENDING" | "SENT" | "FAILED" | "SKIPPED";
+        InquiryNotificationStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" | "SKIPPED";
         TradeInquirySummary: {
             status: components["schemas"]["TradeInquiryStatus"];
             notificationStatus: components["schemas"]["InquiryNotificationStatus"];
@@ -1434,6 +1434,8 @@ export interface components {
             notificationAttempts: number;
             /** Format: date-time */
             notificationLastAttemptAt: string | null;
+            /** @description Whether the inbox offers "resend": a failed attempt, or one a crash left PENDING or SENDING for 5 minutes. */
+            notificationRetryable: boolean;
             notes: components["schemas"]["TradeInquiryNoteResponse"][];
         };
         UpdateTradeInquiryDto: {

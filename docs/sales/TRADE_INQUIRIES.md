@@ -36,7 +36,7 @@ Migration `backend/prisma/migrations/20261112090000_trade_inquiries`.
 | `landingPage`, `referrerOrigin`, `utmSource/Medium/Campaign` | Path only, origin only, UTM values. No query strings, no full referrer URL, no honeypot value. |
 | `contactConsentAt` | When the buyer ticked the consent box. |
 | `assignedToId` | Optional user; set to null if that user is deleted. |
-| `notificationStatus` | `PENDING` / `SENT` / `FAILED` / `SKIPPED` (email disabled), with `notificationAttempts`, `notificationLastAttemptAt`. |
+| `notificationStatus` | `PENDING` / `SENDING` / `SENT` / `FAILED` / `SKIPPED` (email disabled), with `notificationAttempts` (also the attempt's claim token) and `notificationLastAttemptAt`. |
 | `createdAt`, `updatedAt`, `lastActivityAt` | |
 
 Indexes: `createdAt`; `(status, createdAt)`; `(assignedToId, status)`; `email`; `(productId, createdAt)`; `(utmSource, createdAt)`.
@@ -144,9 +144,26 @@ that looks like a field of the email. The saved inquiry is unchanged.
   `Inquiry <reference>: notification email failed (<error code>)` — no addresses, credentials or buyer data.
 - Once the inquiry is committed the website gets its reference, even if recording the notification state then fails
   (logged as `Inquiry <reference>: notification state not recorded (<error code>)`; the inquiry stays `PENDING` and can
-  be resent).
+  be resent after 5 minutes).
 - A duplicate submission never sends another email.
-- Sales can retry from the inquiry page ("Gửi lại email thông báo"); each retry is audited.
+- Sales can retry from the inquiry page ("Gửi lại email thông báo"); each retry that actually runs is audited.
+- The SMTP connection is always encrypted: implicit TLS with `SMTP_SECURE=true` (port 465), otherwise STARTTLS is
+  required (`requireTLS`), and a server that does not offer it makes the attempt `FAILED` instead of sending the buyer's
+  details in clear text.
+
+**One attempt at a time, across API instances.** PostgreSQL is the lock: an attempt starts with one conditional update
+that moves the notification to `SENDING` and increments `notificationAttempts`; only the caller whose update matched
+sends. The initial attempt claims `PENDING`; a manual resend claims `FAILED`, `SENT` or `SKIPPED`, or a `PENDING` /
+`SENDING` left by a crash (no progress for 5 minutes, against a 2.5 s budget). An attempt writes its result only while
+the notification is still `SENDING` under its own attempt number, so a taken-over attempt can never overwrite a newer
+one. A resend while an attempt runs gets **409 `NOTIFICATION_IN_PROGRESS`**: nothing is sent, nothing is audited. The
+inbox offers "resend" only where the API reports `notificationRetryable` (a failed attempt, or a crashed one).
+
+```
+PENDING ──claim──► SENDING ──► SENT | FAILED
+FAILED / SENT / SKIPPED ──manual claim──► SENDING ──► …
+PENDING / SENDING without progress for 5 min ──manual claim──► SENDING (takeover) ──► …
+```
 - With `INQUIRY_NOTIFY_EMAIL_ENABLED` unset the status is `SKIPPED`; the inbox is still the record.
 
 ## Audit
@@ -164,7 +181,7 @@ never the buyer's email, phone, company or notes.
 | `INQUIRY_NOTIFY_EMAIL_ENABLED` | – | `true` to send the email. |
 | `INQUIRY_NOTIFY_TO` | when email on | Comma-separated recipients. |
 | `INQUIRY_NOTIFY_FROM` | when email on | A sender the SMTP provider allows (SPF/DKIM on that domain). |
-| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_SECURE` (`true` for 465), `SMTP_USER`, `SMTP_PASS` | when email on | |
+| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_SECURE` (`true` for 465), `SMTP_USER`, `SMTP_PASS` | when email on | `SMTP_SECURE=true`: implicit TLS; otherwise STARTTLS is required. There is no unencrypted mode. |
 | `CMS_PUBLIC_URL` | when email on | CMS frontend URL for the email link. In production it must parse as an `https:` URL with a host (`https://` alone is refused); it is stored without a trailing slash. |
 
 Rotate the secret by setting the new value on the CMS and the website together; requests signed with the old value

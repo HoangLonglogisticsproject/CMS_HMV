@@ -1,10 +1,13 @@
-import { loadConfig } from '../../config';
+import { loadConfig, trimTrailingSlashes } from '../../config';
+import { AppError } from '../../common/errors';
+import { blankToNull, buildBrief } from './inquiry-brief';
 import { ORIGINS, PRODUCTS, lookup, requirementsFor } from './inquiry-contract';
 import {
   type InquiryEmail,
   type InquiryNotifier,
   buildInquiryEmail,
   sendWithin,
+  smtpTransportOptions,
 } from './inquiry-notifier';
 import { REFERENCE, createReference } from './inquiry-reference';
 import {
@@ -12,7 +15,12 @@ import {
   signIngestRequest,
   verifyIngestRequest,
 } from './inquiry-signature';
-import { vietnamBound } from './trade-inquiries.service';
+import {
+  STALE_ATTEMPT_MS,
+  notificationRetryable,
+  vietnamBound,
+} from './trade-inquiries.service';
+import { type IngestTradeInquiryDto, isFilterDate } from './trade-inquiry.dto';
 
 // Shared with the website (HMV_landingpage src/next/inquiry/service.test.js and docs/inbound/TRADE_DESK_DELIVERY.md):
 // both repositories must produce this exact signature over these exact body bytes, or the integration has drifted.
@@ -409,5 +417,190 @@ describe('trade inquiry configuration', () => {
       loadConfig({ ...email, CMS_PUBLIC_URL: 'http://localhost:3000/' })
         .tradeInquiries.cmsPublicUrl,
     ).toBe('http://localhost:3000');
+  });
+});
+
+describe('SMTP transport', () => {
+  const smtp = {
+    host: 'smtp.hmv.test',
+    port: 587,
+    secure: false,
+    user: 'u',
+    pass: 'p',
+  };
+  it('is always encrypted: implicit TLS when secure, STARTTLS required otherwise', () => {
+    expect(
+      smtpTransportOptions({ ...smtp, port: 465, secure: true }),
+    ).toMatchObject({
+      secure: true,
+      requireTLS: false,
+      port: 465,
+    });
+    expect(smtpTransportOptions(smtp)).toMatchObject({
+      secure: false,
+      requireTLS: true,
+      port: 587,
+    });
+    expect(smtpTransportOptions({ ...smtp, user: '' }).auth).toBeUndefined();
+  });
+});
+
+describe('notification retry rule', () => {
+  const now = new Date('2026-11-12T08:00:00Z');
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+  const at = (
+    notificationStatus: 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'SKIPPED',
+    age = 0,
+  ) => ({
+    notificationStatus,
+    notificationLastAttemptAt: ago(age),
+    createdAt: ago(age),
+  });
+  it('a failed attempt, or one a crash left PENDING or SENDING for 5 minutes; never a running one', () => {
+    expect(notificationRetryable(at('FAILED'), now)).toBe(true);
+    expect(notificationRetryable(at('SENDING'), now)).toBe(false);
+    expect(notificationRetryable(at('PENDING'), now)).toBe(false);
+    expect(
+      notificationRetryable(at('SENDING', STALE_ATTEMPT_MS + 1), now),
+    ).toBe(true);
+    expect(
+      notificationRetryable(at('PENDING', STALE_ATTEMPT_MS + 1), now),
+    ).toBe(true);
+    expect(notificationRetryable(at('SENT', STALE_ATTEMPT_MS + 1), now)).toBe(
+      false,
+    );
+    expect(notificationRetryable(at('SKIPPED'), now)).toBe(false);
+  });
+});
+
+describe('inquiry brief', () => {
+  const dto = (over: object) =>
+    ({
+      locale: 'en',
+      goal: 'sourcing',
+      productId: 'dried-cassava-chips',
+      requirements: {},
+      contact: { company: 'Feed Co', email: 'Buyer@Example.com' },
+      consentAt: '2026-11-12T08:00:00.000Z',
+      ...over,
+    }) as IngestTradeInquiryDto;
+  const issues = (over: object) => {
+    try {
+      buildBrief(dto(over));
+    } catch (err) {
+      return (err as AppError).details;
+    }
+    return [];
+  };
+
+  it('reports every issue, in order: product, unit, application, transport, requirements', () => {
+    expect(
+      issues({
+        productId: 'gold',
+        volume: { unit: 'barrels' },
+        transport: 'teleport',
+        requirements: { admin: 'x', incoterm: 'XYZ' },
+      }),
+    ).toEqual([
+      { path: 'productId', message: 'productId must be a Trade Desk product' },
+      { path: 'volume.unit', message: 'unknown volume unit' },
+      { path: 'transport', message: 'unknown transport' },
+      { path: 'requirements.admin', message: 'unknown requirement' },
+      { path: 'requirements.incoterm', message: 'unknown requirement' },
+    ]);
+    expect(
+      issues({ goal: 'customs', productId: 'dried-cassava-chips', goods: ' ' }),
+    ).toEqual([
+      {
+        path: 'productId',
+        message: 'productId is for sourcing inquiries only',
+      },
+      { path: 'goods', message: 'goods is required for this goal' },
+    ]);
+    expect(
+      issues({
+        origin: 'thailand',
+        application: 'fuel',
+        requirements: { incoterm: 'XYZ', starch: 'x'.repeat(201), moisture: 7 },
+      }),
+    ).toEqual([
+      { path: 'origin', message: 'origin is not offered for this product' },
+      { path: 'application', message: 'unknown application' },
+      { path: 'requirements.incoterm', message: 'unknown option' },
+      {
+        path: 'requirements.starch',
+        message: 'must be a string of at most 200 characters',
+      },
+      {
+        path: 'requirements.moisture',
+        message: 'must be a string of at most 200 characters',
+      },
+    ]);
+  });
+
+  it('stores labels, the contract order, the default origin and unit; blank answers are left out', () => {
+    const brief = buildBrief(
+      dto({
+        volume: { amount: ' 5000 ', unit: 'mt_month' },
+        application: 'feed',
+        requirements: { incoterm: 'CIF', starch: ' 70 ', moisture: '' },
+      }),
+    );
+    expect(brief).toMatchObject({
+      productId: 'dried-cassava-chips',
+      productName: 'Dried cassava chips',
+      goods: null,
+      origin: 'Vietnam',
+      volumeAmount: '5000',
+      volumeUnit: 'MT / month',
+      application: 'Animal feed',
+      transport: null,
+      email: 'buyer@example.com',
+      contactName: null,
+    });
+    expect(brief.requirements).toEqual([
+      { key: 'starch', label: 'Required starch %', value: '70' },
+      { key: 'incoterm', label: 'Incoterm', value: 'CIF' },
+    ]);
+    expect(blankToNull('  ')).toBeNull();
+    expect(blankToNull(undefined)).toBeNull();
+    expect(blankToNull(' x ')).toBe('x');
+  });
+});
+
+describe('inbox date filter format', () => {
+  it('a plain date or an ISO 8601 date-time (minutes at least, optional offset)', () => {
+    for (const ok of [
+      '2026-11-12',
+      '2026-11-12T08:00',
+      '2026-11-12T08:00:00Z',
+      '2026-11-12T08:00:00.123+07:00',
+    ])
+      expect(isFilterDate(ok)).toBe(true);
+    for (const bad of [
+      '2026-W46',
+      '2026-316',
+      '2026-11',
+      '2026-11-12T08',
+      '12/11/2026',
+      '2026-13-01',
+      '2026-02-30',
+      'x',
+      20261112,
+    ])
+      expect(isFilterDate(bad)).toBe(false);
+  });
+});
+
+describe('trailing slashes', () => {
+  it('are removed without a regex; nothing else changes', () => {
+    expect(trimTrailingSlashes('https://cms.hmv.test///')).toBe(
+      'https://cms.hmv.test',
+    );
+    expect(trimTrailingSlashes('https://cms.hmv.test/admin')).toBe(
+      'https://cms.hmv.test/admin',
+    );
+    expect(trimTrailingSlashes('///')).toBe('');
+    expect(trimTrailingSlashes('')).toBe('');
   });
 });

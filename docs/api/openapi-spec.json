@@ -3979,7 +3979,8 @@
           "INTEGRATION_DISABLED",
           "SIGNATURE_INVALID",
           "INQUIRY_NOT_FOUND",
-          "ASSIGNEE_INVALID"
+          "ASSIGNEE_INVALID",
+          "NOTIFICATION_IN_PROGRESS"
         ]
       },
       "ErrorResponse": {
@@ -6093,7 +6094,7 @@
           "amount": {
             "type": "string",
             "maxLength": 20,
-            "pattern": "^([0-9][0-9.,\\s]*)?$"
+            "pattern": "^(\\d[\\d.,\\s]*)?$"
           },
           "unit": {
             "type": "string",
@@ -6120,7 +6121,7 @@
           "phone": {
             "type": "string",
             "maxLength": 40,
-            "pattern": "^[+0-9()\\s.-]*$"
+            "pattern": "^[+\\d()\\s.-]*$"
           }
         },
         "required": [
@@ -6272,6 +6273,7 @@
         "type": "string",
         "enum": [
           "PENDING",
+          "SENDING",
           "SENT",
           "FAILED",
           "SKIPPED"
@@ -6654,6 +6656,10 @@
             "type": "string",
             "nullable": true
           },
+          "notificationRetryable": {
+            "type": "boolean",
+            "description": "Whether the inbox offers \"resend\": a failed attempt, or one a crash left PENDING or SENDING for 5 minutes."
+          },
           "notes": {
             "type": "array",
             "items": {
@@ -6695,6 +6701,7 @@
           "updatedAt",
           "notificationAttempts",
           "notificationLastAttemptAt",
+          "notificationRetryable",
           "notes"
         ]
       },

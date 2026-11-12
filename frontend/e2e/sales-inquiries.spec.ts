@@ -122,7 +122,8 @@ test("a deep link to an inquiry survives sign-in", async ({ page }) => {
 test("on page 2, a poll that shrinks the results to one page moves to page 1 (never 'Trang 2/1')", async ({ page }) => {
   await page.clock.install();
   const prefix = `Clamp ${randomUUID().slice(0, 8)}`;
-  for (let i = 0; i < 21; i++) await ingestInquiry(`${prefix} ${String(i).padStart(2, "0")}`);
+  // 21 independent inquiries (each its own idempotency key), received together.
+  await Promise.all(Array.from({ length: 21 }, (_, i) => ingestInquiry(`${prefix} ${String(i).padStart(2, "0")}`)));
 
   await loginViaUi(page, "sales", "/sales/inquiries");
   await page.getByLabel("Trạng thái").selectOption("NEW");

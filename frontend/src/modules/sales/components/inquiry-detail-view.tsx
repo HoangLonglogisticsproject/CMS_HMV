@@ -37,7 +37,7 @@ import {
 const SELECT =
   "h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#087EC2] disabled:opacity-60";
 
-export function InquiryDetailView({ inquiryId }: { inquiryId: string }) {
+export function InquiryDetailView({ inquiryId }: Readonly<{ inquiryId: string }>) {
   const can = useCan();
   if (!can("inquiry:read")) {
     return (
@@ -52,7 +52,7 @@ export function InquiryDetailView({ inquiryId }: { inquiryId: string }) {
   return <InquiryDetailLoader inquiryId={inquiryId} />;
 }
 
-function InquiryDetailLoader({ inquiryId }: { inquiryId: string }) {
+function InquiryDetailLoader({ inquiryId }: Readonly<{ inquiryId: string }>) {
   const { data, isLoading, error } = useTradeInquiry(inquiryId);
   if (isLoading) return <p className="text-xs text-slate-500">Đang tải yêu cầu…</p>;
   if (error || !data)
@@ -73,7 +73,7 @@ function BackLink() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <Card className="p-4 border-slate-200 shadow-2xs bg-white space-y-3">
       <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{title}</h2>
@@ -82,7 +82,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function Field({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
   return (
     <div className="grid grid-cols-[124px_1fr] gap-2 text-xs">
       <dt className="text-slate-500">{label}</dt>
@@ -91,7 +91,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
+function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
   const can = useCan();
   const canWrite = can("inquiry:write");
   const update = useUpdateInquiry(inquiry.id);
@@ -239,7 +239,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
         <div className="space-y-4">
           <Section title="Xử lý">
             <label className="block space-y-1 text-xs text-slate-500">
-              Trạng thái
+              <span>Trạng thái</span>
               <select
                 aria-label="Trạng thái"
                 className={SELECT}
@@ -257,7 +257,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
               </select>
             </label>
             <label className="block space-y-1 text-xs text-slate-500">
-              Người phụ trách
+              <span>Người phụ trách</span>
               <select
                 aria-label="Người phụ trách"
                 className={SELECT}
@@ -306,7 +306,7 @@ function InquiryDetailBody({ inquiry }: { inquiry: InquiryDetail }) {
             <p className="text-[11px] text-slate-500">
               {inquiry.notificationAttempts} lần gửi · lần cuối {formatVietnamDateTime(inquiry.notificationLastAttemptAt)}
             </p>
-            {canWrite && (inquiry.notificationStatus === "FAILED" || inquiry.notificationStatus === "PENDING") && (
+            {canWrite && inquiry.notificationRetryable && (
               <Button
                 size="sm"
                 variant="outline"

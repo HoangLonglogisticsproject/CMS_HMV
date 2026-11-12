@@ -37,6 +37,95 @@ const PAGE_SIZE = 20;
 const SELECT =
   "h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#087EC2]";
 
+/** The inbox columns: pure render functions of a row, no component state. */
+const columns: ColumnDef<InquirySummary>[] = [
+  {
+    id: "reference",
+    header: "Mã / nhận lúc",
+    cell: ({ row }) => (
+      <div className="whitespace-nowrap">
+        <Link
+          href={`/sales/inquiries/${row.original.id}`}
+          className="font-mono font-semibold text-[#087EC2] hover:underline"
+        >
+          {row.original.reference}
+        </Link>
+        <div className="text-[11px] text-slate-500">{formatVietnamDateTime(row.original.createdAt)}</div>
+      </div>
+    ),
+  },
+  {
+    id: "buyer",
+    header: "Công ty / người mua",
+    cell: ({ row }) => (
+      <div className="min-w-0 max-w-[180px]">
+        <div className="font-semibold text-slate-900 truncate" title={row.original.company}>
+          {row.original.company}
+        </div>
+        {row.original.contactName && (
+          <div className="text-[11px] text-slate-500 truncate">{row.original.contactName}</div>
+        )}
+      </div>
+    ),
+  },
+  {
+    id: "subject",
+    header: "Sản phẩm / nhu cầu",
+    cell: ({ row }) => (
+      <div className="min-w-0 max-w-[180px]">
+        <div className="text-slate-800 truncate" title={inquirySubject(row.original)}>
+          {inquirySubject(row.original)}
+        </div>
+        <div className="text-[11px] text-slate-500">
+          {GOAL_LABEL[row.original.goal] ?? row.original.goal} · {row.original.locale.toUpperCase()}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "destination",
+    header: "Điểm đến",
+    cell: ({ row }) => (
+      <div className="max-w-[120px] truncate text-slate-700" title={row.original.destination ?? undefined}>
+        {row.original.destination ?? "—"}
+      </div>
+    ),
+  },
+  {
+    id: "volume",
+    header: "Khối lượng",
+    cell: ({ row }) => (
+      <span className="text-slate-700 whitespace-nowrap">{inquiryVolume(row.original) ?? "—"}</span>
+    ),
+  },
+  {
+    id: "source",
+    header: "Nguồn",
+    cell: ({ row }) => (
+      <div className="max-w-[110px] truncate text-[11px] text-slate-500">{inquirySource(row.original)}</div>
+    ),
+  },
+  {
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <Badge variant={STATUS_VARIANT[row.original.status]} className="whitespace-nowrap">
+        {STATUS_LABEL[row.original.status]}
+      </Badge>
+    ),
+  },
+  {
+    id: "assigned",
+    header: "Phụ trách",
+    cell: ({ row }) =>
+      row.original.assignedTo ? (
+        <span className="text-slate-700 whitespace-nowrap">{row.original.assignedTo.displayName}</span>
+      ) : (
+        <span className="text-[11px] text-amber-700 whitespace-nowrap">Chưa giao</span>
+      ),
+  },
+];
+
 export function InquiriesView() {
   const can = useCan();
   // The API refuses the inbox without inquiry:read; checking first also avoids requests that would 403.
@@ -107,96 +196,13 @@ function InquiryInbox() {
   if (settled !== page) setPage(settled);
   const filtered = Boolean(search || status || productId || goal || assignee || dateFrom || dateTo || utmSource);
 
-  const columns = useMemo<ColumnDef<InquirySummary>[]>(
-    () => [
-      {
-        id: "reference",
-        header: "Mã / nhận lúc",
-        cell: ({ row }) => (
-          <div className="whitespace-nowrap">
-            <Link
-              href={`/sales/inquiries/${row.original.id}`}
-              className="font-mono font-semibold text-[#087EC2] hover:underline"
-            >
-              {row.original.reference}
-            </Link>
-            <div className="text-[11px] text-slate-500">{formatVietnamDateTime(row.original.createdAt)}</div>
-          </div>
-        ),
-      },
-      {
-        id: "buyer",
-        header: "Công ty / người mua",
-        cell: ({ row }) => (
-          <div className="min-w-0 max-w-[180px]">
-            <div className="font-semibold text-slate-900 truncate" title={row.original.company}>
-              {row.original.company}
-            </div>
-            {row.original.contactName && (
-              <div className="text-[11px] text-slate-500 truncate">{row.original.contactName}</div>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: "subject",
-        header: "Sản phẩm / nhu cầu",
-        cell: ({ row }) => (
-          <div className="min-w-0 max-w-[180px]">
-            <div className="text-slate-800 truncate" title={inquirySubject(row.original)}>
-              {inquirySubject(row.original)}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              {GOAL_LABEL[row.original.goal] ?? row.original.goal} · {row.original.locale.toUpperCase()}
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "destination",
-        header: "Điểm đến",
-        cell: ({ row }) => (
-          <div className="max-w-[120px] truncate text-slate-700" title={row.original.destination ?? undefined}>
-            {row.original.destination ?? "—"}
-          </div>
-        ),
-      },
-      {
-        id: "volume",
-        header: "Khối lượng",
-        cell: ({ row }) => (
-          <span className="text-slate-700 whitespace-nowrap">{inquiryVolume(row.original) ?? "—"}</span>
-        ),
-      },
-      {
-        id: "source",
-        header: "Nguồn",
-        cell: ({ row }) => (
-          <div className="max-w-[110px] truncate text-[11px] text-slate-500">{inquirySource(row.original)}</div>
-        ),
-      },
-      {
-        id: "status",
-        header: "Trạng thái",
-        cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]} className="whitespace-nowrap">
-            {STATUS_LABEL[row.original.status]}
-          </Badge>
-        ),
-      },
-      {
-        id: "assigned",
-        header: "Phụ trách",
-        cell: ({ row }) =>
-          row.original.assignedTo ? (
-            <span className="text-slate-700 whitespace-nowrap">{row.original.assignedTo.displayName}</span>
-          ) : (
-            <span className="text-[11px] text-amber-700 whitespace-nowrap">Chưa giao</span>
-          ),
-      },
-    ],
-    [],
-  );
+
+  // What the table body shows instead of rows, if anything: loading, an error, or why there are no rows.
+  const emptyMessage = filtered ? "Không có yêu cầu nào khớp bộ lọc." : "Chưa có yêu cầu nào từ website.";
+  let message: { text: string; tone: string } | null = null;
+  if (isLoading) message = { text: "Đang tải yêu cầu…", tone: "text-slate-500" };
+  else if (listError) message = { text: `Không tải được danh sách yêu cầu: ${errorMessage(listError)}`, tone: "text-rose-600" };
+  else if (!items.length) message = { text: emptyMessage, tone: "text-slate-500" };
 
   const table = useReactTable({
     data: items,
@@ -284,11 +290,11 @@ function InquiryInbox() {
             ))}
           </select>
           <label className="flex items-center gap-1 text-[11px] text-slate-500">
-            Từ
+            <span>Từ</span>
             <Input type="date" value={dateFrom} onChange={(e) => filter(setDateFrom)(e.target.value)} className="h-8 w-[130px] text-xs" />
           </label>
           <label className="flex items-center gap-1 text-[11px] text-slate-500">
-            đến
+            <span>đến</span>
             <Input type="date" value={dateTo} onChange={(e) => filter(setDateTo)(e.target.value)} className="h-8 w-[130px] text-xs" />
           </label>
           <Input
@@ -316,19 +322,13 @@ function InquiryInbox() {
               ))}
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {message ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="h-32 text-center text-xs text-slate-500">
-                    Đang tải yêu cầu…
+                  <TableCell colSpan={columns.length} className={`h-32 text-center text-xs ${message.tone}`}>
+                    {message.text}
                   </TableCell>
                 </TableRow>
-              ) : listError ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-32 text-center text-xs text-rose-600">
-                    Không tải được danh sách yêu cầu: {errorMessage(listError)}
-                  </TableCell>
-                </TableRow>
-              ) : items.length ? (
+              ) : (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
@@ -345,12 +345,6 @@ function InquiryInbox() {
                     ))}
                   </TableRow>
                 ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-32 text-center text-xs text-slate-500">
-                    {filtered ? "Không có yêu cầu nào khớp bộ lọc." : "Chưa có yêu cầu nào từ website."}
-                  </TableCell>
-                </TableRow>
               )}
             </TableBody>
           </Table>

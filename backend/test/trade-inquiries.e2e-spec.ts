@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { TradeInquiry } from '@prisma/client';
 import request from 'supertest';
 import {
   INQUIRY_NOTIFIER,
@@ -43,6 +44,89 @@ const cassava = (over: object = {}) => ({
   consentAt: new Date().toISOString(),
   ...over,
 });
+
+/** What seedInquiries needs from the test: the signed ingestion request and the row lookup. */
+interface SeedContext {
+  ingest: (body: object) => request.Test;
+  row: (reference: string) => Promise<TradeInquiry>;
+}
+
+/** Three inquiries, received in this order: cassava (EN), passion fruit (VI, utm google), customs (no product). */
+async function seedInquiries({ ingest, row }: SeedContext) {
+  const a = await ingest(cassava()).expect(201);
+  const b = await ingest(
+    cassava({
+      locale: 'vi',
+      productId: 'passion-fruit',
+      origin: 'vietnam',
+      application: undefined,
+      destination: 'Rotterdam',
+      requirements: { brix: '14+' },
+      contact: { company: 'Fresh BV', email: 'buyer@fresh.example' },
+      source: { utm: { source: 'google' } },
+    }),
+  ).expect(201);
+  const c = await ingest(
+    cassava({
+      goal: 'customs',
+      productId: null,
+      origin: 'Laos',
+      goods: 'Chemical samples',
+      application: undefined,
+      requirements: { service: 'import' },
+      contact: { company: 'Chem Ltd', email: 'ops@chem.example' },
+      source: undefined,
+    }),
+  ).expect(201);
+  return Promise.all([a, b, c].map((r) => row(r.body.reference)));
+}
+
+/** Bodies the ingestion refuses: unknown fields, bad values, uncontrolled requirements, inherited names, wrong types. */
+const REFUSED: object[] = [
+  cassava({ admin: true }),
+  cassava({ locale: 'fr' }),
+  cassava({ goal: 'loans' }),
+  cassava({ contact: { company: 'Feed Co', email: 'not-an-email' } }),
+  cassava({ notes: 'x'.repeat(2001) }),
+  cassava({ volume: { amount: 'lots', unit: 'mt' } }),
+  cassava({ source: { utm: { source: '<script>' } } }),
+  cassava({
+    source: { landingPage: '/products/x?email=buyer@example.com' },
+  }),
+  cassava({
+    source: { referrer: 'https://www.google.com/search?q=hmv' },
+  }),
+  cassava({ requirements: { admin: 'yes' } }),
+  cassava({ requirements: { incoterm: 'XYZ' } }),
+  cassava({ productId: 'gold' }),
+  cassava({ origin: 'thailand' }),
+  cassava({ goal: 'customs', productId: null, goods: '' }),
+  cassava({ consentAt: 'yesterday' }),
+  cassava({ website: 'filled-by-a-bot' }),
+  // Inherited names are never contract keys or options (a 400, not a 500).
+  cassava({ productId: '__proto__' }),
+  cassava({ productId: 'constructor' }),
+  cassava({ productId: 'unknown-product' }),
+  cassava({ requirements: { incoterm: '__proto__' } }),
+  cassava({ requirements: { incoterm: 'constructor' } }),
+  cassava({ requirements: { incoterm: 'toString' } }),
+  cassava({
+    goal: 'customs',
+    productId: null,
+    goods: 'Samples',
+    requirements: { service: '__proto__' },
+  }),
+  cassava({ origin: '__proto__' }),
+  cassava({ application: 'constructor' }),
+  cassava({ transport: '__proto__' }),
+  cassava({ volume: { amount: '5', unit: 'constructor' } }),
+  // contact, volume and source must be objects.
+  cassava({ contact: [] }),
+  cassava({ contact: null }),
+  cassava({ contact: 'x' }),
+  cassava({ volume: [] }),
+  cassava({ source: 'x' }),
+];
 
 describe('Trade inquiries (PostgreSQL)', () => {
   let t: TestApp;
@@ -204,62 +288,27 @@ describe('Trade inquiries (PostgreSQL)', () => {
       expect(await t.prisma.tradeInquiry.count()).toBe(0);
     });
 
-    it('validation: unknown fields, bad values and uncontrolled requirements are refused', async () => {
-      const refused = [
-        cassava({ admin: true }),
-        cassava({ locale: 'fr' }),
-        cassava({ goal: 'loans' }),
-        cassava({ contact: { company: 'Feed Co', email: 'not-an-email' } }),
-        cassava({ notes: 'x'.repeat(2001) }),
-        cassava({ volume: { amount: 'lots', unit: 'mt' } }),
-        cassava({ source: { utm: { source: '<script>' } } }),
-        cassava({
-          source: { landingPage: '/products/x?email=buyer@example.com' },
-        }),
-        cassava({
-          source: { referrer: 'https://www.google.com/search?q=hmv' },
-        }),
-        cassava({ requirements: { admin: 'yes' } }),
-        cassava({ requirements: { incoterm: 'XYZ' } }),
-        cassava({ productId: 'gold' }),
-        cassava({ origin: 'thailand' }),
-        cassava({ goal: 'customs', productId: null, goods: '' }),
-        cassava({ consentAt: 'yesterday' }),
-        cassava({ website: 'http://spam' }),
-        // Inherited names are never contract keys or options (a 400, not a 500).
-        cassava({ productId: '__proto__' }),
-        cassava({ productId: 'constructor' }),
-        cassava({ productId: 'unknown-product' }),
-        cassava({ requirements: { incoterm: '__proto__' } }),
-        cassava({ requirements: { incoterm: 'constructor' } }),
-        cassava({ requirements: { incoterm: 'toString' } }),
-        cassava({
-          goal: 'customs',
-          productId: null,
-          goods: 'Samples',
-          requirements: { service: '__proto__' },
-        }),
-        cassava({ origin: '__proto__' }),
-        cassava({ application: 'constructor' }),
-        cassava({ transport: '__proto__' }),
-        cassava({ volume: { amount: '5', unit: 'constructor' } }),
-        // contact, volume and source must be objects.
-        cassava({ contact: [] }),
-        cassava({ contact: null }),
-        cassava({ contact: 'x' }),
-        cassava({ volume: [] }),
-        cassava({ source: 'x' }),
-      ];
-      for (const body of refused) {
+    it.each(REFUSED.map((body) => [JSON.stringify(body).slice(0, 90), body]))(
+      'validation refuses %s (400, nothing saved)',
+      async (_name, body) => {
         const res = await ingest(body);
-        expect(res.status, JSON.stringify(body).slice(0, 120)).toBe(400);
+        expect(res.status).toBe(400);
         expect(res.body.code).toBe('VALIDATION_FAILED');
-      }
-      // A JSON body that is not an object at all.
-      for (const body of [null, [], 'x'])
+        expect(await t.prisma.tradeInquiry.count()).toBe(0);
+      },
+    );
+
+    it.each([
+      ['null', null],
+      ['an array', []],
+      ['a string', 'x'],
+    ])(
+      'a JSON body that is not an object (%s) is refused',
+      async (_name, body) => {
         expect((await ingest(body)).status).toBe(400);
-      expect(await t.prisma.tradeInquiry.count()).toBe(0);
-    });
+        expect(await t.prisma.tradeInquiry.count()).toBe(0);
+      },
+    );
 
     it('a failed email keeps the inquiry (FAILED), logs neither secrets nor contact details; resend succeeds and is audited', async () => {
       const warn = vi.spyOn(Logger.prototype, 'warn');
@@ -321,8 +370,9 @@ describe('Trade inquiries (PostgreSQL)', () => {
 
     it('a failure recording the notification after the inquiry is committed still accepts the inquiry', async () => {
       const error = vi.spyOn(Logger.prototype, 'error');
-      const update = vi
-        .spyOn(t.prisma.tradeInquiry, 'update')
+      // The first notification write is the claim (PENDING → SENDING).
+      const claim = vi
+        .spyOn(t.prisma.tradeInquiry, 'updateMany')
         .mockRejectedValueOnce(
           Object.assign(new Error('connection lost for buyer@example.com'), {
             code: 'P1001',
@@ -338,9 +388,118 @@ describe('Trade inquiries (PostgreSQL)', () => {
         expect(logged).toContain('(P1001)');
         expect(logged).not.toMatch(/buyer@example|Feed Co/);
       } finally {
-        update.mockRestore();
+        claim.mockRestore();
         error.mockRestore();
       }
+    });
+
+    /** The next send waits until the test settles it; `started` resolves once the send began (the attempt claimed). */
+    function holdNextSend() {
+      let settle:
+        { resolve: () => void; reject: (err: Error) => void } | undefined;
+      let began: () => void = () => {};
+      const started = new Promise<void>((resolve) => (began = resolve));
+      notifier.send.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            settle = { resolve, reject };
+            began();
+          }),
+      );
+      return { started, settle: () => settle! };
+    }
+    const resend = (id: string) =>
+      sales.post(`${ADMIN}/${id}/resend-notification`);
+    const retries = async (id: string) =>
+      (await audits(id)).filter(
+        (a) => a.action === 'inquiry.notification_retry',
+      );
+
+    it('two simultaneous resends: one attempt sends, the other is refused (409) without sending or an audit entry', async () => {
+      notifier.send.mockRejectedValueOnce(new Error('first attempt fails'));
+      const { id } = await row(
+        (await ingest(cassava()).expect(201)).body.reference,
+      );
+      const held = holdNextSend();
+      const first = resend(id).then((r) => r);
+      await held.started;
+      const second = await resend(id).expect(409);
+      expect(second.body.code).toBe('NOTIFICATION_IN_PROGRESS');
+      held.settle().resolve();
+      expect((await first).body).toMatchObject({
+        notificationStatus: 'SENT',
+        notificationAttempts: 2,
+      });
+      expect(notifier.send).toHaveBeenCalledTimes(2); // the initial attempt and one resend
+      expect(await retries(id)).toHaveLength(1);
+    });
+
+    it('a resend while the initial attempt is sending is refused; the inbox offers no resend; one email', async () => {
+      const held = holdNextSend();
+      const ingesting = ingest(cassava()).then((r) => r);
+      await held.started;
+      const [{ id, reference }] = await t.prisma.tradeInquiry.findMany();
+      expect((await row(reference)).notificationStatus).toBe('SENDING');
+      expect(
+        (await sales.get(`${ADMIN}/${id}`).expect(200)).body
+          .notificationRetryable,
+      ).toBe(false);
+      expect((await resend(id).expect(409)).body.code).toBe(
+        'NOTIFICATION_IN_PROGRESS',
+      );
+      held.settle().resolve();
+      expect((await ingesting).status).toBe(201);
+      expect((await row(reference)).notificationStatus).toBe('SENT');
+      expect(notifier.send).toHaveBeenCalledTimes(1);
+      expect(await retries(id)).toHaveLength(0);
+    });
+
+    it('a failed attempt is FAILED; a later manual retry claims it and sends once', async () => {
+      const held = holdNextSend();
+      const ingesting = ingest(cassava()).then((r) => r);
+      await held.started;
+      held
+        .settle()
+        .reject(Object.assign(new Error('refused'), { code: 'EENVELOPE' }));
+      const { reference } = (await ingesting).body;
+      const { id } = await row(reference);
+      expect((await row(reference)).notificationStatus).toBe('FAILED');
+      expect(
+        (await sales.get(`${ADMIN}/${id}`).expect(200)).body
+          .notificationRetryable,
+      ).toBe(true);
+      expect((await resend(id).expect(201)).body.notificationStatus).toBe(
+        'SENT',
+      );
+      expect(notifier.send).toHaveBeenCalledTimes(2);
+      expect(await retries(id)).toHaveLength(1);
+    });
+
+    it('an attempt that crashed (SENDING for 5 minutes) can be taken over; its late result never overwrites the newer one', async () => {
+      const first = holdNextSend();
+      const ingesting = ingest(cassava()).then((r) => r);
+      await first.started;
+      const [{ id, reference }] = await t.prisma.tradeInquiry.findMany();
+      await t.prisma.tradeInquiry.update({
+        where: { id },
+        data: { notificationLastAttemptAt: new Date(Date.now() - 6 * 60_000) },
+      });
+      // Attempt 2 takes over and is still sending when attempt 1 ends, late and failed.
+      const second = holdNextSend();
+      const takeover = resend(id).then((r) => r);
+      await second.started;
+      first
+        .settle()
+        .reject(Object.assign(new Error('late'), { code: 'ECONNRESET' }));
+      expect((await ingesting).status).toBe(201);
+      // Attempt 1 no longer holds the claim: its FAILED is not written over attempt 2.
+      expect((await row(reference)).notificationStatus).toBe('SENDING');
+      second.settle().resolve();
+      expect((await takeover).body).toMatchObject({
+        notificationStatus: 'SENT',
+        notificationAttempts: 2,
+      });
+      expect((await row(reference)).notificationStatus).toBe('SENT');
     });
 
     it('with notification email disabled the inquiry is saved and marked SKIPPED', async () => {
@@ -370,37 +529,9 @@ describe('Trade inquiries (PostgreSQL)', () => {
 
   describe('sales inbox', () => {
     /** Three inquiries: cassava (EN, linkedin), passion fruit (VI) and a customs request. */
-    async function seed() {
-      const a = await ingest(cassava()).expect(201);
-      const b = await ingest(
-        cassava({
-          locale: 'vi',
-          productId: 'passion-fruit',
-          origin: 'vietnam',
-          application: undefined,
-          destination: 'Rotterdam',
-          requirements: { brix: '14+' },
-          contact: { company: 'Fresh BV', email: 'buyer@fresh.example' },
-          source: { utm: { source: 'google' } },
-        }),
-      ).expect(201);
-      const c = await ingest(
-        cassava({
-          goal: 'customs',
-          productId: null,
-          origin: 'Laos',
-          goods: 'Chemical samples',
-          application: undefined,
-          requirements: { service: 'import' },
-          contact: { company: 'Chem Ltd', email: 'ops@chem.example' },
-          source: undefined,
-        }),
-      ).expect(201);
-      return Promise.all([a, b, c].map((r) => row(r.body.reference)));
-    }
 
     it('lists newest first with server pagination; rows are summaries without contact details or the brief JSON', async () => {
-      const [, , customs] = await seed();
+      const [, , customs] = await seedInquiries({ ingest, row });
       const page1 = await sales.get(`${ADMIN}?pageSize=2`).expect(200);
       expectContract(page1.body, 'TradeInquiryListResponse');
       expect(page1.body).toMatchObject({ total: 3, page: 1, pageSize: 2 });
@@ -413,7 +544,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('filters by status, goal, product, locale, source, assignee, dates and search', async () => {
-      const [cas, pas] = await seed();
+      const [cas, pas] = await seedInquiries({ ingest, row });
       const refs = async (query: string) =>
         (await sales.get(`${ADMIN}?${query}`).expect(200)).body.items.map(
           (i: { reference: string }) => i.reference,
@@ -452,7 +583,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('a filter date is a Vietnam calendar day (UTC+7), whatever the server time zone', async () => {
-      const [a, b, c] = await seed();
+      const [a, b, c] = await seedInquiries({ ingest, row });
       const at = (inquiry: { id: string }, iso: string) =>
         t.prisma.tradeInquiry.update({
           where: { id: inquiry.id },
@@ -477,7 +608,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('stats count by status, today and the last 7 days', async () => {
-      const [cas] = await seed();
+      const [cas] = await seedInquiries({ ingest, row });
       await sales.patch(`${ADMIN}/${cas.id}`, { status: 'WON' }).expect(200);
       const res = await sales.get(`${ADMIN}/stats`).expect(200);
       expectContract(res.body, 'TradeInquiryStatsResponse');
@@ -495,7 +626,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('detail: the brief, contact, source, notes and notification state; unknown id is 404', async () => {
-      const [cas] = await seed();
+      const [cas] = await seedInquiries({ ingest, row });
       const res = await sales.get(`${ADMIN}/${cas.id}`).expect(200);
       expectContract(res.body, 'TradeInquiryDetailResponse');
       expect(res.body).toMatchObject({
@@ -511,7 +642,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('status changes and assignments are audited; only active users with inquiry:write can be assigned', async () => {
-      const [cas] = await seed();
+      const [cas] = await seedInquiries({ ingest, row });
       const colleague = await t.signIn('SALES');
       const editor = await t.signIn('EDITOR');
       await sales
@@ -569,7 +700,7 @@ describe('Trade inquiries (PostgreSQL)', () => {
     });
 
     it('internal notes: added, audited, listed on the detail, and moving lastActivityAt', async () => {
-      const [cas] = await seed();
+      const [cas] = await seedInquiries({ ingest, row });
       const note = await sales
         .post(`${ADMIN}/${cas.id}/notes`, {
           body: '  Called the buyer, sample requested.  ',
@@ -593,14 +724,19 @@ describe('Trade inquiries (PostgreSQL)', () => {
       });
     });
 
+    it.each(['EDITOR', 'REVIEWER', 'VIEWER'])(
+      '%s has no access to the sales inbox',
+      async (role) => {
+        const [cas] = await seedInquiries({ ingest, row });
+        const other = await t.signIn(role);
+        await other.get(ADMIN).expect(403);
+        await other.get(`${ADMIN}/${cas.id}`).expect(403);
+        await other.patch(`${ADMIN}/${cas.id}`, { status: 'LOST' }).expect(403);
+      },
+    );
+
     it('permissions: SALES and ADMIN only; writes need the CSRF header; no public listing', async () => {
-      const [cas] = await seed();
-      for (const role of ['EDITOR', 'REVIEWER', 'VIEWER']) {
-        const s = await t.signIn(role);
-        await s.get(ADMIN).expect(403);
-        await s.get(`${ADMIN}/${cas.id}`).expect(403);
-        await s.patch(`${ADMIN}/${cas.id}`, { status: 'LOST' }).expect(403);
-      }
+      const [cas] = await seedInquiries({ ingest, row });
       const admin = await t.signIn('ADMIN');
       await admin.get(ADMIN).expect(200);
       await admin.patch(`${ADMIN}/${cas.id}`, { status: 'LOST' }).expect(200);

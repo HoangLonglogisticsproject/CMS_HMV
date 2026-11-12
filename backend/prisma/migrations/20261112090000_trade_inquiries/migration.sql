@@ -2,7 +2,7 @@
 CREATE TYPE "TradeInquiryStatus" AS ENUM ('NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'WON', 'LOST');
 
 -- CreateEnum
-CREATE TYPE "InquiryNotificationStatus" AS ENUM ('PENDING', 'SENT', 'FAILED', 'SKIPPED');
+CREATE TYPE "InquiryNotificationStatus" AS ENUM ('PENDING', 'SENDING', 'SENT', 'FAILED', 'SKIPPED');
 
 -- CreateTable
 CREATE TABLE "trade_inquiries" (
@@ -103,7 +103,11 @@ INSERT INTO "roles" ("code", "name", "description") VALUES
   ('SALES', 'Sales', 'Handles trade inquiries from the website')
 ON CONFLICT ("code") DO NOTHING;
 
-INSERT INTO "role_permissions" ("roleCode", "permissionCode") VALUES
-  ('SALES', 'inquiry:read'), ('SALES', 'inquiry:write'),
-  ('ADMIN', 'inquiry:read'), ('ADMIN', 'inquiry:write')
+-- Both inquiry permissions (declared once, above) for both roles: the cross product of the two sets.
+INSERT INTO "role_permissions" ("roleCode", "permissionCode")
+SELECT grantee."code", permission."code"
+FROM "roles" AS grantee
+CROSS JOIN "permissions" AS permission
+WHERE grantee."code" IN ('SALES', 'ADMIN')
+  AND permission."code" LIKE 'inquiry:%'
 ON CONFLICT DO NOTHING;
