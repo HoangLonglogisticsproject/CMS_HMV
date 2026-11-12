@@ -25,12 +25,6 @@ export const STATUS_VARIANT: Record<Status, NonNullable<BadgeProps["variant"]>> 
   LOST: "outline",
 };
 
-export const GOAL_LABEL: Record<string, string> = {
-  sourcing: "Thu mua nông sản",
-  logistics: "Vận chuyển / logistics",
-  customs: "Thủ tục hải quan",
-};
-
 /** Website product ids (the ingestion contract); the stored productName stays in English as the buyer saw it. */
 export const PRODUCT_LABEL: Record<string, string> = {
   "passion-fruit": "Chanh dây",
@@ -50,18 +44,42 @@ export const NOTIFICATION_LABEL: Record<NotificationStatus, string> = {
   SKIPPED: "Email thông báo đang tắt",
 };
 
+/** The inbox column's short form of the notification state. */
+export const NOTIFICATION_SHORT: Record<NotificationStatus, string> = {
+  PENDING: "Chờ gửi",
+  SENDING: "Đang gửi",
+  SENT: "Đã gửi",
+  FAILED: "Gửi lỗi",
+  SKIPPED: "Đang tắt",
+};
+
+/** Requirement keys of the supply execution (packing, terms, route, compliance, timing); the others specify the product. */
+const EXECUTION_KEYS = new Set([
+  "packaging",
+  "loading",
+  "incoterm",
+  "certification",
+  "deliveryWindow",
+  "destinationPort",
+  "destinationRequirements",
+  "spec-packaging",
+  "spec-carton-weight",
+  "spec-cold-chain",
+  "spec-destination-requirements",
+]);
+
+/** The buyer's answered requirements, in their stored order: product specification, then supply execution. */
+export const splitRequirements = <T extends { key: string }>(requirements: readonly T[]) => ({
+  specification: requirements.filter((r) => !EXECUTION_KEYS.has(r.key)),
+  execution: requirements.filter((r) => EXECUTION_KEYS.has(r.key)),
+});
+
 interface Brief {
-  productName: string | null;
-  goods: string | null;
-  goal: string;
   volumeAmount: string | null;
   volumeUnit: string | null;
   utmSource: string | null;
   referrerOrigin: string | null;
 }
-
-/** What the buyer asked about: the product, else the goods they described, else the goal. */
-export const inquirySubject = (i: Brief) => i.productName ?? i.goods ?? GOAL_LABEL[i.goal] ?? i.goal;
 
 export const inquiryVolume = (i: Brief) =>
   i.volumeAmount ? [i.volumeAmount, i.volumeUnit].filter(Boolean).join(" ") : null;

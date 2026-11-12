@@ -42,10 +42,8 @@ const summarySelect = {
   status: true,
   createdAt: true,
   locale: true,
-  goal: true,
   productId: true,
   productName: true,
-  goods: true,
   destination: true,
   volumeAmount: true,
   volumeUnit: true,
@@ -226,7 +224,6 @@ export class TradeInquiriesService {
         await audit(tx, {}, 'inquiry.create', ENTITY, created.id, {
           reference: created.reference,
           status: created.status,
-          goal: created.goal,
           productId: created.productId,
         });
         return created;
@@ -372,7 +369,6 @@ export class TradeInquiriesService {
     });
     return {
       status: q.status,
-      goal: q.goal,
       productId: q.productId,
       locale: q.locale,
       utmSource: q.utmSource,

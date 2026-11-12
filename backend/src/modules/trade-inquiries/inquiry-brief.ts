@@ -1,7 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { AppError, type Issue } from '../../common/errors';
 import {
-  type InquiryGoal,
   ORIGINS,
   PRODUCTS,
   type ProductRule,
@@ -16,7 +15,7 @@ import type { IngestTradeInquiryDto } from './trade-inquiry.dto';
 
 // The controlled brief of an ingested inquiry: checked against the contract, labelled for the sales team. Each helper
 // checks one part and returns its value with the issues it found; buildBrief() reports all issues together, in this
-// order: goal and product, origin, unit / application / transport, requirements.
+// order: product, origin, unit / application / transport, requirements.
 
 /** Trimmed text; null when missing or blank. */
 export const blankToNull = (value: string | null | undefined) =>
@@ -24,32 +23,21 @@ export const blankToNull = (value: string | null | undefined) =>
 
 const MAX_REQUIREMENT_LENGTH = 200;
 
-/** Sourcing needs a contract product; the other goals need the goods and take no product. */
-function resolveGoal(dto: IngestTradeInquiryDto) {
-  const issues: Issue[] = [];
-  if (dto.goal !== 'sourcing') {
-    if (dto.productId)
-      issues.push({
-        path: 'productId',
-        message: 'productId is for sourcing inquiries only',
-      });
-    if (!blankToNull(dto.goods))
-      issues.push({
-        path: 'goods',
-        message: 'goods is required for this goal',
-      });
-    return { product: undefined, issues };
-  }
+/** The inquiry's product: one of the contract's products. */
+function resolveProduct(dto: IngestTradeInquiryDto) {
   const product = lookup(PRODUCTS, dto.productId);
-  if (!product)
-    issues.push({
-      path: 'productId',
-      message: 'productId must be a Trade Desk product',
-    });
+  const issues: Issue[] = product
+    ? []
+    : [
+        {
+          path: 'productId',
+          message: 'productId must be a Trade Desk product',
+        },
+      ];
   return { product, issues };
 }
 
-/** Sourcing: one of the product's origins (its first by default), as a label. Other goals: the buyer's text. */
+/** One of the product's origins (its first by default), as a label. */
 function resolveOrigin(
   dto: IngestTradeInquiryDto,
   product: ProductRule | undefined,
@@ -118,8 +106,8 @@ function checkRequirement(
 }
 
 /** The answered requirements, labelled and in the contract's order, so every inquiry reads the same way. */
-function resolveRequirements(goal: InquiryGoal, dto: IngestTradeInquiryDto) {
-  const rules = requirementsFor(goal, dto.productId);
+function resolveRequirements(dto: IngestTradeInquiryDto) {
+  const rules = requirementsFor(dto.productId);
   const issues: Issue[] = [];
   const requirements: StoredRequirement[] = [];
   for (const [key, raw] of Object.entries(dto.requirements)) {
@@ -140,21 +128,17 @@ function resolveRequirements(goal: InquiryGoal, dto: IngestTradeInquiryDto) {
  * VALIDATION_FAILED with every issue when any part is outside the contract.
  */
 export function buildBrief(dto: IngestTradeInquiryDto) {
-  const goal = dto.goal as InquiryGoal;
-  const { product, issues: goalIssues } = resolveGoal(dto);
+  const { product, issues: productIssues } = resolveProduct(dto);
   const { origin, issues: originIssues } = resolveOrigin(dto, product);
   const options = resolveOptions(dto, product);
-  const { requirements, issues: requirementIssues } = resolveRequirements(
-    goal,
-    dto,
-  );
+  const { requirements, issues: requirementIssues } = resolveRequirements(dto);
   const issues = [
-    ...goalIssues,
+    ...productIssues,
     ...originIssues,
     ...options.issues,
     ...requirementIssues,
   ];
-  if (issues.length)
+  if (!product || issues.length)
     throw new AppError(
       400,
       'VALIDATION_FAILED',
@@ -165,10 +149,8 @@ export function buildBrief(dto: IngestTradeInquiryDto) {
   const amount = blankToNull(dto.volume?.amount);
   return {
     locale: dto.locale,
-    goal,
-    productId: product ? dto.productId! : null,
-    productName: product?.name ?? null,
-    goods: goal === 'sourcing' ? null : blankToNull(dto.goods),
+    productId: dto.productId,
+    productName: product.name,
     origin,
     destination: blankToNull(dto.destination),
     volumeAmount: amount,

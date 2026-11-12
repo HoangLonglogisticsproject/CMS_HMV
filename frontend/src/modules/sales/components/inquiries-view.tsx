@@ -21,14 +21,14 @@ import {
   useTradeInquiryStats,
 } from "../queries/use-trade-inquiries";
 import {
-  GOAL_LABEL,
   INQUIRY_STATUSES,
+  NOTIFICATION_LABEL,
+  NOTIFICATION_SHORT,
   PRODUCT_LABEL,
   STATUS_LABEL,
   STATUS_VARIANT,
   formatVietnamDateTime,
   inquirySource,
-  inquirySubject,
   inquiryVolume,
   settledPage,
 } from "../utils/inquiry-format";
@@ -69,16 +69,14 @@ const columns: ColumnDef<InquirySummary>[] = [
     ),
   },
   {
-    id: "subject",
-    header: "Sản phẩm / nhu cầu",
+    id: "product",
+    header: "Sản phẩm",
     cell: ({ row }) => (
       <div className="min-w-0 max-w-[180px]">
-        <div className="text-slate-800 truncate" title={inquirySubject(row.original)}>
-          {inquirySubject(row.original)}
+        <div className="text-slate-800 truncate" title={row.original.productName}>
+          {row.original.productName}
         </div>
-        <div className="text-[11px] text-slate-500">
-          {GOAL_LABEL[row.original.goal] ?? row.original.goal} · {row.original.locale.toUpperCase()}
-        </div>
+        <div className="text-[11px] text-slate-500">{row.original.locale.toUpperCase()}</div>
       </div>
     ),
   },
@@ -99,19 +97,24 @@ const columns: ColumnDef<InquirySummary>[] = [
     ),
   },
   {
-    id: "source",
-    header: "Nguồn",
-    cell: ({ row }) => (
-      <div className="max-w-[110px] truncate text-[11px] text-slate-500">{inquirySource(row.original)}</div>
-    ),
-  },
-  {
     id: "status",
     header: "Trạng thái",
     cell: ({ row }) => (
       <Badge variant={STATUS_VARIANT[row.original.status]} className="whitespace-nowrap">
         {STATUS_LABEL[row.original.status]}
       </Badge>
+    ),
+  },
+  {
+    id: "notification",
+    header: "Email",
+    cell: ({ row }) => (
+      <span
+        className="text-[11px] text-slate-500 whitespace-nowrap"
+        title={NOTIFICATION_LABEL[row.original.notificationStatus]}
+      >
+        {NOTIFICATION_SHORT[row.original.notificationStatus]}
+      </span>
     ),
   },
   {
@@ -123,6 +126,13 @@ const columns: ColumnDef<InquirySummary>[] = [
       ) : (
         <span className="text-[11px] text-amber-700 whitespace-nowrap">Chưa giao</span>
       ),
+  },
+  {
+    id: "source",
+    header: "Nguồn",
+    cell: ({ row }) => (
+      <div className="max-w-[110px] truncate text-[11px] text-slate-500">{inquirySource(row.original)}</div>
+    ),
   },
 ];
 
@@ -148,7 +158,6 @@ function InquiryInbox() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [productId, setProductId] = useState("");
-  const [goal, setGoal] = useState("");
   const [assignee, setAssignee] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -177,7 +186,6 @@ function InquiryInbox() {
     search: search || undefined,
     status: (status || undefined) as InquiryStatus | undefined,
     productId: productId || undefined,
-    goal: (goal || undefined) as InquiryListParams["goal"],
     assignedToId: assignee && assignee !== "UNASSIGNED" ? assignee : undefined,
     unassigned: assignee === "UNASSIGNED" ? true : undefined,
     dateFrom: dateFrom || undefined,
@@ -194,7 +202,7 @@ function InquiryInbox() {
   // "Trang 2/1" is never shown).
   const settled = settledPage(page, pageCount, Boolean(list) && !isPlaceholderData);
   if (settled !== page) setPage(settled);
-  const filtered = Boolean(search || status || productId || goal || assignee || dateFrom || dateTo || utmSource);
+  const filtered = Boolean(search || status || productId || assignee || dateFrom || dateTo || utmSource);
 
 
   // What the table body shows instead of rows, if anything: loading, an error, or why there are no rows.
@@ -267,14 +275,6 @@ function InquiryInbox() {
           <select aria-label="Sản phẩm" value={productId} onChange={(e) => filter(setProductId)(e.target.value)} className={SELECT}>
             <option value="">Tất cả sản phẩm</option>
             {Object.entries(PRODUCT_LABEL).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select aria-label="Nhu cầu" value={goal} onChange={(e) => filter(setGoal)(e.target.value)} className={SELECT}>
-            <option value="">Tất cả nhu cầu</option>
-            {Object.entries(GOAL_LABEL).map(([id, label]) => (
               <option key={id} value={id}>
                 {label}
               </option>

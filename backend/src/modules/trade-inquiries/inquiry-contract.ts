@@ -1,11 +1,11 @@
-// The HMV Trade Desk inquiry contract: the goals, products, origins, units and requirement keys the website may send.
+// The HMV Trade Desk inquiry contract: the products, origins, units and requirement keys the website may send. Every
+// inquiry is product-led: HMV offers one integrated supply process (origin, quality, packaging, documents, logistics),
+// so logistics and compliance are requirements of the product's supply plan, never inquiries of their own.
 // Mirrors the website's controlled rules (HMV_landingpage src/features/trade-desk/rules.js); the CMS validates against
 // this copy and is authoritative. A key or option missing here is refused, so a website change needs this file updated
 // in the same release (docs/sales/TRADE_INQUIRIES.md, "Contract").
 
 export const INQUIRY_LOCALES = ['en', 'vi'] as const;
-export const INQUIRY_GOALS = ['sourcing', 'logistics', 'customs'] as const;
-export type InquiryGoal = (typeof INQUIRY_GOALS)[number];
 
 export const ORIGINS: Record<string, string> = {
   vietnam: 'Vietnam',
@@ -133,41 +133,6 @@ export const PRODUCTS: Record<string, ProductRule> = {
   },
 };
 
-export const GOAL_REQUIREMENTS: Record<
-  Exclude<InquiryGoal, 'sourcing'>,
-  Requirement[]
-> = {
-  logistics: [
-    {
-      key: 'cargoType',
-      label: 'Cargo type',
-      options: {
-        general: 'General cargo',
-        reefer: 'Temperature-controlled',
-        dangerous: 'Dangerous goods',
-        oversized: 'Oversized / project cargo',
-      },
-    },
-    text('readyDate', 'Cargo ready date'),
-    INCOTERM,
-    text('packaging', 'Packing details'),
-  ],
-  customs: [
-    {
-      key: 'service',
-      label: 'Service needed',
-      options: {
-        import: 'Import clearance',
-        export: 'Export clearance',
-        documents: 'Documents & certificates review',
-        dg: 'Dangerous-goods classification',
-      },
-    },
-    text('hsCode', 'HS code, if known'),
-    text('timing', 'Required timing'),
-  ],
-};
-
 /**
  * `table[key]` only for the table's own keys: website input is never used to reach inherited members
  * ("__proto__", "constructor", "toString"…), which would pass a plain `table[key]` truthiness check.
@@ -180,13 +145,9 @@ export const lookup = <T>(
     ? table[key]
     : undefined;
 
-export const requirementsFor = (
-  goal: InquiryGoal,
-  productId: string | null | undefined,
-) =>
-  goal === 'sourcing'
-    ? (lookup(PRODUCTS, productId)?.requirements ?? [])
-    : GOAL_REQUIREMENTS[goal];
+/** The requirement fields of a product; none for an unknown product. */
+export const requirementsFor = (productId: string | null | undefined) =>
+  lookup(PRODUCTS, productId)?.requirements ?? [];
 
 /** Stored requirement: the controlled key, its label and the value (an option's label for choices). */
 export interface StoredRequirement {

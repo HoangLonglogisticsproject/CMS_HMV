@@ -3238,19 +3238,6 @@
             }
           },
           {
-            "name": "goal",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "sourcing",
-                "logistics",
-                "customs"
-              ]
-            }
-          },
-          {
             "name": "locale",
             "required": false,
             "in": "query",
@@ -6189,28 +6176,14 @@
               "vi"
             ]
           },
-          "goal": {
-            "type": "string",
-            "enum": [
-              "sourcing",
-              "logistics",
-              "customs"
-            ]
-          },
           "productId": {
             "type": "string",
-            "nullable": true,
-            "description": "Website product id; required for sourcing.",
+            "description": "Website product id: every inquiry is for one HMV product. Checked against the contract.",
             "maxLength": 64
-          },
-          "goods": {
-            "type": "string",
-            "description": "Cargo or goods description; required for logistics and customs.",
-            "maxLength": 200
           },
           "origin": {
             "type": "string",
-            "description": "Sourcing: an origin id (\"vietnam\"); otherwise free text.",
+            "description": "An origin id the product offers (\"vietnam\"); the product's first origin when left out.",
             "maxLength": 120
           },
           "destination": {
@@ -6246,7 +6219,7 @@
         "required": [
           "requirements",
           "locale",
-          "goal",
+          "productId",
           "contact",
           "consentAt"
         ]
@@ -6319,20 +6292,11 @@
           "locale": {
             "type": "string"
           },
-          "goal": {
+          "productId": {
             "type": "string"
           },
-          "productId": {
-            "type": "string",
-            "nullable": true
-          },
           "productName": {
-            "type": "string",
-            "nullable": true
-          },
-          "goods": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "destination": {
             "type": "string",
@@ -6382,10 +6346,8 @@
           "reference",
           "createdAt",
           "locale",
-          "goal",
           "productId",
           "productName",
-          "goods",
           "destination",
           "volumeAmount",
           "volumeUnit",
@@ -6554,20 +6516,11 @@
           "locale": {
             "type": "string"
           },
-          "goal": {
+          "productId": {
             "type": "string"
           },
-          "productId": {
-            "type": "string",
-            "nullable": true
-          },
           "productName": {
-            "type": "string",
-            "nullable": true
-          },
-          "goods": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "destination": {
             "type": "string",
@@ -6684,10 +6637,8 @@
           "reference",
           "createdAt",
           "locale",
-          "goal",
           "productId",
           "productName",
-          "goods",
           "destination",
           "volumeAmount",
           "volumeUnit",

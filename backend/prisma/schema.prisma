@@ -587,12 +587,10 @@ model TradeInquiry {
   idempotencyKey String             @unique // from the website: a resubmission returns the same inquiry
   status         TradeInquiryStatus @default(NEW)
   locale         String // "en" | "vi"
-  goal           String // "sourcing" | "logistics" | "customs"
 
-  // Commercial requirement snapshot
-  productId    String? // website product id, e.g. "dried-cassava-chips"
-  productName  String?
-  goods        String?
+  // Commercial requirement snapshot: always product-led (one integrated supply process per product)
+  productId    String // website product id, e.g. "dried-cassava-chips"
+  productName  String
   origin       String?
   destination  String?
   volumeAmount String?

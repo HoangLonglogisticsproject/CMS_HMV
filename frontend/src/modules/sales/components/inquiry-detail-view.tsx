@@ -20,7 +20,6 @@ import {
   useUpdateInquiry,
 } from "../queries/use-trade-inquiries";
 import {
-  GOAL_LABEL,
   INQUIRY_STATUSES,
   NOTIFICATION_LABEL,
   STATUS_LABEL,
@@ -28,9 +27,9 @@ import {
   buyerMailto,
   formatVietnamDateTime,
   inquirySource,
-  inquirySubject,
   inquiryVolume,
   noteAfterSave,
+  splitRequirements,
   whatsAppLink,
 } from "../utils/inquiry-format";
 
@@ -91,6 +90,62 @@ function Field({ label, value }: Readonly<{ label: string; value: React.ReactNod
   );
 }
 
+/** B. the product requirement and C. its supply execution: only what the buyer gave, nothing filled in. */
+function RequirementSections({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
+  const volume = inquiryVolume(inquiry);
+  const { specification, execution } = splitRequirements(inquiry.requirements);
+  const missing = [
+    ["Người liên hệ", inquiry.contactName],
+    ["Số điện thoại", inquiry.phone],
+    ["Xuất xứ", inquiry.origin],
+    ["Điểm đến", inquiry.destination],
+    ["Khối lượng", volume],
+  ]
+    .filter(([, v]) => !v)
+    .map(([label]) => label);
+
+  return (
+    <>
+      <Section title="Yêu cầu thương mại">
+        <dl className="space-y-1.5">
+          <Field label="Sản phẩm" value={inquiry.productName} />
+          <Field label="Xuất xứ" value={inquiry.origin} />
+          <Field label="Điểm đến" value={inquiry.destination} />
+          <Field label="Khối lượng" value={volume} />
+          <Field label="Ứng dụng" value={inquiry.application} />
+          <Field label="Vận chuyển" value={inquiry.transport} />
+          {specification.map((r) => (
+            <Field key={r.key} label={r.label} value={r.value} />
+          ))}
+        </dl>
+        {inquiry.buyerNotes && (
+          <div className="rounded-md bg-slate-50 border border-slate-100 p-3 text-xs text-slate-800 whitespace-pre-wrap">
+            {inquiry.buyerNotes}
+          </div>
+        )}
+        {missing.length > 0 && (
+          <p className="text-[11px] text-amber-700" data-testid="inquiry-missing">
+            Chưa cung cấp — cần hỏi thêm: {missing.join(", ")}.
+          </p>
+        )}
+      </Section>
+
+      <Section title="Yêu cầu thực thi cung ứng">
+        {execution.length === 0 && (
+          <p className="text-xs text-slate-400" data-testid="inquiry-execution-empty">
+            Người mua chưa nêu yêu cầu về đóng gói, điều kiện giao hàng, chứng nhận hay thời gian giao.
+          </p>
+        )}
+        <dl className="space-y-1.5" data-testid="inquiry-execution">
+          {execution.map((r) => (
+            <Field key={r.key} label={r.label} value={r.value} />
+          ))}
+        </dl>
+      </Section>
+    </>
+  );
+}
+
 function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
   const can = useCan();
   const canWrite = can("inquiry:write");
@@ -100,18 +155,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
   const { data: assignees } = useInquiryAssignees(canWrite);
   const [note, setNote] = useState("");
 
-  const subject = inquirySubject(inquiry);
-  const volume = inquiryVolume(inquiry);
   const whatsApp = whatsAppLink(inquiry.phone);
-  const missing = [
-    ["Người liên hệ", inquiry.contactName],
-    ["Số điện thoại", inquiry.phone],
-    ["Điểm đến", inquiry.destination],
-    ["Khối lượng", volume],
-    ...(inquiry.goal === "sourcing" ? [["Xuất xứ", inquiry.origin]] : []),
-  ]
-    .filter(([, v]) => !v)
-    .map(([label]) => label);
 
   const save = (body: Parameters<typeof update.mutate>[0], done: string) =>
     update.mutate(body, {
@@ -142,12 +186,12 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
           <Badge variant="outline">{inquiry.locale.toUpperCase()}</Badge>
         </div>
         <p className="text-xs text-slate-600">
-          <strong className="text-slate-900">{inquiry.company}</strong> · {subject} ·{" "}
-          {GOAL_LABEL[inquiry.goal] ?? inquiry.goal} · nhận lúc {formatVietnamDateTime(inquiry.createdAt)}
+          <strong className="text-slate-900">{inquiry.company}</strong> · {inquiry.productName} · nhận lúc{" "}
+          {formatVietnamDateTime(inquiry.createdAt)}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="h-8 text-xs bg-[#087EC2] hover:bg-[#066ba8] text-white gap-1.5">
-            <a href={buyerMailto(inquiry.email, inquiry.reference, subject)}>
+            <a href={buyerMailto(inquiry.email, inquiry.reference, inquiry.productName)}>
               <Mail className="h-3.5 w-3.5" /> Gửi email cho người mua
             </a>
           </Button>
@@ -168,30 +212,17 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
-          <Section title="Yêu cầu của người mua">
+          <Section title="Người mua / liên hệ">
             <dl className="space-y-1.5">
-              <Field label="Sản phẩm / hàng hoá" value={subject} />
-              {inquiry.goods && inquiry.productName && <Field label="Mô tả hàng" value={inquiry.goods} />}
-              <Field label="Xuất xứ" value={inquiry.origin} />
-              <Field label="Điểm đến" value={inquiry.destination} />
-              <Field label="Khối lượng" value={volume} />
-              <Field label="Ứng dụng" value={inquiry.application} />
-              <Field label="Vận chuyển" value={inquiry.transport} />
-              {inquiry.requirements.map((r) => (
-                <Field key={r.key} label={r.label} value={r.value} />
-              ))}
+              <Field label="Công ty" value={inquiry.company} />
+              <Field label="Người liên hệ" value={inquiry.contactName} />
+              <Field label="Email" value={<a className="text-[#087EC2] hover:underline" href={`mailto:${inquiry.email}`}>{inquiry.email}</a>} />
+              <Field label="Điện thoại" value={inquiry.phone} />
+              <Field label="Đồng ý liên hệ" value={formatVietnamDateTime(inquiry.contactConsentAt)} />
             </dl>
-            {inquiry.buyerNotes && (
-              <div className="rounded-md bg-slate-50 border border-slate-100 p-3 text-xs text-slate-800 whitespace-pre-wrap">
-                {inquiry.buyerNotes}
-              </div>
-            )}
-            {missing.length > 0 && (
-              <p className="text-[11px] text-amber-700" data-testid="inquiry-missing">
-                Chưa cung cấp — cần hỏi thêm: {missing.join(", ")}.
-              </p>
-            )}
           </Section>
+
+          <RequirementSections inquiry={inquiry} />
 
           <Section title="Ghi chú nội bộ">
             {inquiry.notes.length === 0 && <p className="text-xs text-slate-400">Chưa có ghi chú.</p>}
@@ -237,7 +268,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
         </div>
 
         <div className="space-y-4">
-          <Section title="Xử lý">
+          <Section title="Xử lý bán hàng">
             <label className="block space-y-1 text-xs text-slate-500">
               <span>Trạng thái</span>
               <select
@@ -277,15 +308,36 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
                 ))}
               </select>
             </label>
-          </Section>
-
-          <Section title="Liên hệ">
-            <dl className="space-y-1.5">
-              <Field label="Công ty" value={inquiry.company} />
-              <Field label="Người liên hệ" value={inquiry.contactName} />
-              <Field label="Email" value={<a className="text-[#087EC2] hover:underline" href={`mailto:${inquiry.email}`}>{inquiry.email}</a>} />
-              <Field label="Điện thoại" value={inquiry.phone} />
-              <Field label="Đồng ý liên hệ" value={formatVietnamDateTime(inquiry.contactConsentAt)} />
+            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-800" data-testid="inquiry-notification">
+                {NOTIFICATION_LABEL[inquiry.notificationStatus]}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {inquiry.notificationAttempts} lần gửi · lần cuối {formatVietnamDateTime(inquiry.notificationLastAttemptAt)}
+              </p>
+              {canWrite && inquiry.notificationRetryable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5"
+                  disabled={resend.isPending}
+                  onClick={() =>
+                    resend.mutate(undefined, {
+                      onSuccess: (d) =>
+                        d.notificationStatus === "SENT"
+                          ? toast.success("Đã gửi lại email thông báo")
+                          : toast.error(NOTIFICATION_LABEL[d.notificationStatus]),
+                      onError: (err) => toast.error("Không gửi lại được", { description: errorMessage(err) }),
+                    })
+                  }
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Gửi lại email thông báo
+                </Button>
+              )}
+            </div>
+            <dl className="space-y-1.5 border-t border-slate-100 pt-3">
+              <Field label="Hoạt động gần nhất" value={formatVietnamDateTime(inquiry.lastActivityAt)} />
+              <Field label="Cập nhật" value={formatVietnamDateTime(inquiry.updatedAt)} />
             </dl>
           </Section>
 
@@ -296,42 +348,6 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
               <Field label="Trang giới thiệu" value={inquiry.referrerOrigin} />
               <Field label="utm_medium" value={inquiry.utmMedium} />
               <Field label="utm_campaign" value={inquiry.utmCampaign} />
-            </dl>
-          </Section>
-
-          <Section title="Email thông báo">
-            <p className="text-xs text-slate-800" data-testid="inquiry-notification">
-              {NOTIFICATION_LABEL[inquiry.notificationStatus]}
-            </p>
-            <p className="text-[11px] text-slate-500">
-              {inquiry.notificationAttempts} lần gửi · lần cuối {formatVietnamDateTime(inquiry.notificationLastAttemptAt)}
-            </p>
-            {canWrite && inquiry.notificationRetryable && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs gap-1.5"
-                disabled={resend.isPending}
-                onClick={() =>
-                  resend.mutate(undefined, {
-                    onSuccess: (d) =>
-                      d.notificationStatus === "SENT"
-                        ? toast.success("Đã gửi lại email thông báo")
-                        : toast.error(NOTIFICATION_LABEL[d.notificationStatus]),
-                    onError: (err) => toast.error("Không gửi lại được", { description: errorMessage(err) }),
-                  })
-                }
-              >
-                <RefreshCw className="h-3.5 w-3.5" /> Gửi lại email thông báo
-              </Button>
-            )}
-          </Section>
-
-          <Section title="Thời gian">
-            <dl className="space-y-1.5">
-              <Field label="Nhận lúc" value={formatVietnamDateTime(inquiry.createdAt)} />
-              <Field label="Hoạt động gần nhất" value={formatVietnamDateTime(inquiry.lastActivityAt)} />
-              <Field label="Cập nhật" value={formatVietnamDateTime(inquiry.updatedAt)} />
             </dl>
           </Section>
         </div>

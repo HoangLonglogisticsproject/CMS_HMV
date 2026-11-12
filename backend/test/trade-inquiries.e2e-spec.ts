@@ -21,7 +21,6 @@ const ADMIN = '/api/v1/admin/trade-inquiries';
 
 const cassava = (over: object = {}) => ({
   locale: 'en',
-  goal: 'sourcing',
   productId: 'dried-cassava-chips',
   origin: 'cambodia',
   destination: 'Qinzhou, China',
@@ -51,7 +50,7 @@ interface SeedContext {
   row: (reference: string) => Promise<TradeInquiry>;
 }
 
-/** Three inquiries, received in this order: cassava (EN), passion fruit (VI, utm google), customs (no product). */
+/** Three inquiries, received in this order: cassava (EN), passion fruit (VI, utm google), cashew nuts (no source). */
 async function seedInquiries({ ingest, row }: SeedContext) {
   const a = await ingest(cassava()).expect(201);
   const b = await ingest(
@@ -68,12 +67,11 @@ async function seedInquiries({ ingest, row }: SeedContext) {
   ).expect(201);
   const c = await ingest(
     cassava({
-      goal: 'customs',
-      productId: null,
-      origin: 'Laos',
-      goods: 'Chemical samples',
+      productId: 'nuts',
+      origin: undefined,
       application: undefined,
-      requirements: { service: 'import' },
+      transport: undefined,
+      requirements: { incoterm: 'FOB' },
       contact: { company: 'Chem Ltd', email: 'ops@chem.example' },
       source: undefined,
     }),
@@ -85,7 +83,11 @@ async function seedInquiries({ ingest, row }: SeedContext) {
 const REFUSED: object[] = [
   cassava({ admin: true }),
   cassava({ locale: 'fr' }),
-  cassava({ goal: 'loans' }),
+  // Every inquiry is product-led: there is no goal or goods field, and a product is required.
+  cassava({ goal: 'sourcing' }),
+  cassava({ goods: 'Chemical samples' }),
+  cassava({ productId: undefined }),
+  cassava({ productId: null }),
   cassava({ contact: { company: 'Feed Co', email: 'not-an-email' } }),
   cassava({ notes: 'x'.repeat(2001) }),
   cassava({ volume: { amount: 'lots', unit: 'mt' } }),
@@ -100,7 +102,6 @@ const REFUSED: object[] = [
   cassava({ requirements: { incoterm: 'XYZ' } }),
   cassava({ productId: 'gold' }),
   cassava({ origin: 'thailand' }),
-  cassava({ goal: 'customs', productId: null, goods: '' }),
   cassava({ consentAt: 'yesterday' }),
   cassava({ website: 'filled-by-a-bot' }),
   // Inherited names are never contract keys or options (a 400, not a 500).
@@ -110,12 +111,6 @@ const REFUSED: object[] = [
   cassava({ requirements: { incoterm: '__proto__' } }),
   cassava({ requirements: { incoterm: 'constructor' } }),
   cassava({ requirements: { incoterm: 'toString' } }),
-  cassava({
-    goal: 'customs',
-    productId: null,
-    goods: 'Samples',
-    requirements: { service: '__proto__' },
-  }),
   cassava({ origin: '__proto__' }),
   cassava({ application: 'constructor' }),
   cassava({ transport: '__proto__' }),
@@ -199,7 +194,6 @@ describe('Trade inquiries (PostgreSQL)', () => {
       expect(saved).toMatchObject({
         status: 'NEW',
         locale: 'en',
-        goal: 'sourcing',
         productId: 'dried-cassava-chips',
         productName: 'Dried cassava chips',
         origin: 'Cambodia',
@@ -231,7 +225,6 @@ describe('Trade inquiries (PostgreSQL)', () => {
       expect(created.metadata).toEqual({
         reference: saved.reference,
         status: 'NEW',
-        goal: 'sourcing',
         productId: 'dried-cassava-chips',
       });
       expect(JSON.stringify(created.metadata)).not.toMatch(
@@ -528,14 +521,12 @@ describe('Trade inquiries (PostgreSQL)', () => {
   });
 
   describe('sales inbox', () => {
-    /** Three inquiries: cassava (EN, linkedin), passion fruit (VI) and a customs request. */
-
     it('lists newest first with server pagination; rows are summaries without contact details or the brief JSON', async () => {
-      const [, , customs] = await seedInquiries({ ingest, row });
+      const [, , nuts] = await seedInquiries({ ingest, row });
       const page1 = await sales.get(`${ADMIN}?pageSize=2`).expect(200);
       expectContract(page1.body, 'TradeInquiryListResponse');
       expect(page1.body).toMatchObject({ total: 3, page: 1, pageSize: 2 });
-      expect(page1.body.items[0].reference).toBe(customs.reference);
+      expect(page1.body.items[0].reference).toBe(nuts.reference);
       expect(page1.body.items[0]).not.toHaveProperty('email');
       expect(page1.body.items[0]).not.toHaveProperty('requirements');
       const page2 = await sales.get(`${ADMIN}?pageSize=2&page=2`).expect(200);
@@ -543,13 +534,14 @@ describe('Trade inquiries (PostgreSQL)', () => {
       await sales.get(`${ADMIN}?pageSize=101`).expect(400);
     });
 
-    it('filters by status, goal, product, locale, source, assignee, dates and search', async () => {
+    it('filters by status, product, locale, source, assignee, dates and search; there is no goal filter', async () => {
       const [cas, pas] = await seedInquiries({ ingest, row });
       const refs = async (query: string) =>
         (await sales.get(`${ADMIN}?${query}`).expect(200)).body.items.map(
           (i: { reference: string }) => i.reference,
         );
-      expect(await refs('goal=customs')).toHaveLength(1);
+      expect(await refs('productId=nuts')).toHaveLength(1);
+      await sales.get(`${ADMIN}?goal=customs`).expect(400);
       expect(await refs('productId=dried-cassava-chips')).toEqual([
         cas.reference,
       ]);

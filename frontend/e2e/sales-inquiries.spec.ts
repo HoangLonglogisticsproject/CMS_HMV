@@ -10,7 +10,6 @@ async function ingestInquiry(company: string) {
   const ts = String(Math.floor(Date.now() / 1000));
   const body = JSON.stringify({
       locale: "en",
-      goal: "sourcing",
       productId: "dried-cassava-chips",
       origin: "cambodia",
       volume: { amount: "5000", unit: "mt_month" },
@@ -59,6 +58,9 @@ test("a website inquiry reaches the sales inbox; sales qualifies, assigns and no
   await expect(page.getByTestId("inquiry-missing")).toContainText("Người liên hệ");
   await expect(page.getByTestId("inquiry-missing")).toContainText("Điểm đến");
   await expect(page.getByText("Required starch %")).toBeVisible();
+  // Incoterm is part of the supply execution, not the product specification.
+  await expect(page.getByTestId("inquiry-execution")).toContainText("CIF");
+  await expect(page.getByTestId("inquiry-execution")).not.toContainText("Required starch %");
   await expect(page.getByRole("link", { name: "Gửi email cho người mua" })).toHaveAttribute(
     "href",
     new RegExp(`^mailto:buyer@example\\.com\\?subject=.*${reference}`),

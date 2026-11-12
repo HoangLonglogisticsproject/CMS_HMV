@@ -17,10 +17,10 @@ import {
   buyerMailto,
   formatVietnamDateTime,
   inquirySource,
-  inquirySubject,
   inquiryVolume,
   noteAfterSave,
   settledPage,
+  splitRequirements,
   whatsAppLink,
 } from "@/modules/sales/utils/inquiry-format";
 
@@ -238,19 +238,20 @@ test.describe("CSRF token ownership (cross-tab identity)", () => {
 
 test.describe("sales inbox formatting", () => {
   const brief = {
-    productName: null,
-    goods: null,
-    goal: "customs",
     volumeAmount: null,
     volumeUnit: null,
     utmSource: null,
     referrerOrigin: null,
   };
 
-  test("subject: product, else goods, else the goal", () => {
-    expect(inquirySubject({ ...brief, productName: "Dried cassava chips", goods: "x" })).toBe("Dried cassava chips");
-    expect(inquirySubject({ ...brief, goods: "Chemical samples" })).toBe("Chemical samples");
-    expect(inquirySubject(brief)).toBe("Thủ tục hải quan");
+  test("requirements: product specification apart from supply execution, each in stored order", () => {
+    const r = (key: string) => ({ key, label: key, value: "x" });
+    const { specification, execution } = splitRequirements(
+      ["starch", "moisture", "loading", "incoterm", "destinationPort", "deliveryWindow", "spec-kernel-grade", "spec-packaging"].map(r),
+    );
+    expect(specification.map((x) => x.key)).toEqual(["starch", "moisture", "spec-kernel-grade"]);
+    expect(execution.map((x) => x.key)).toEqual(["loading", "incoterm", "destinationPort", "deliveryWindow", "spec-packaging"]);
+    expect(splitRequirements([])).toEqual({ specification: [], execution: [] });
   });
 
   test("volume and source", () => {

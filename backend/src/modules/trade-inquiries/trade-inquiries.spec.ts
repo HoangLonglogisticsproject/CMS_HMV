@@ -28,10 +28,10 @@ export const SIGNING_TEST_VECTOR = {
   secret: 'hmv-shared-test-vector-secret-0123456789abcdef',
   timestamp: '1767225600',
   idempotencyKey: '0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69',
-  body: '{"locale":"en","goal":"customs","goods":"Test cargo","requirements":{},"contact":{"company":"Example Co","email":"buyer@example.com"},"consentAt":"2026-01-01T00:00:00.000Z"}',
+  body: '{"locale":"en","productId":"dried-cassava-chips","origin":"vietnam","destination":"Singapore","volume":{"amount":"5000","unit":"mt_month"},"application":"bioethanol","transport":"sea_fcl","requirements":{},"contact":{"company":"Example Co","email":"buyer@example.com"},"consentAt":"2026-01-01T00:00:00.000Z"}',
   bodySha256:
-    'f440d4e1f37ac7063006f0ce11896b0eee0632451af410d48ed7c5f5b873dec1',
-  signature: '7c05a879b426c6be25faf502b443dc310a71424044bf4d32b617e137d8d2d920',
+    '20fe22d201ffaf572bf56b405b8e5695a6e8f270f1312238c40cc078e7431d9c',
+  signature: '37a0452e58562fb1d41ff58ad73f4cc362cd6586e529d2b958476a905d5f4d91',
 };
 
 describe('ingest signature', () => {
@@ -58,7 +58,7 @@ describe('ingest signature', () => {
   });
 
   it('the body is signed: another body, or the same JSON serialized differently, is refused', () => {
-    expect(check({ body: v.body.replace('Test cargo', 'Other cargo') })).toBe(
+    expect(check({ body: v.body.replace('Singapore', 'Rotterdam') })).toBe(
       'unauthenticated',
     );
     expect(check({ body: JSON.stringify(JSON.parse(v.body), null, 1) })).toBe(
@@ -110,9 +110,7 @@ describe('inquiry reference', () => {
 
 describe('inquiry contract', () => {
   it('mirrors the website requirement keys for the buyer pages and the other products', () => {
-    expect(
-      requirementsFor('sourcing', 'passion-fruit').map((r) => r.key),
-    ).toEqual([
+    expect(requirementsFor('passion-fruit').map((r) => r.key)).toEqual([
       'variety',
       'sizeWeight',
       'brix',
@@ -121,9 +119,7 @@ describe('inquiry contract', () => {
       'destinationPort',
       'destinationRequirements',
     ]);
-    expect(
-      requirementsFor('sourcing', 'dried-cassava-chips').map((r) => r.key),
-    ).toEqual([
+    expect(requirementsFor('dried-cassava-chips').map((r) => r.key)).toEqual([
       'starch',
       'moisture',
       'loading',
@@ -131,7 +127,7 @@ describe('inquiry contract', () => {
       'destinationPort',
       'deliveryWindow',
     ]);
-    expect(requirementsFor('sourcing', 'bananas').map((r) => r.key)).toEqual([
+    expect(requirementsFor('bananas').map((r) => r.key)).toEqual([
       'spec-fruit-size',
       'spec-maturity',
       'spec-carton-weight',
@@ -142,11 +138,8 @@ describe('inquiry contract', () => {
       'incoterm',
     ]);
     expect(Object.keys(PRODUCTS)).toHaveLength(7);
-    expect(requirementsFor('customs', null).map((r) => r.key)).toEqual([
-      'service',
-      'hsCode',
-      'timing',
-    ]);
+    // Every inquiry is product-led: no product, no requirement fields.
+    expect(requirementsFor(null)).toEqual([]);
   });
 
   it('lookups use own keys only: inherited names are unknown, never Object.prototype members', () => {
@@ -160,8 +153,8 @@ describe('inquiry contract', () => {
     expect(lookup(PRODUCTS, 'unknown-product')).toBeUndefined();
     expect(lookup(ORIGINS, 'vietnam')).toBe('Vietnam');
     expect(lookup(ORIGINS, null)).toBeUndefined();
-    expect(requirementsFor('sourcing', '__proto__')).toEqual([]);
-    expect(requirementsFor('sourcing', 'constructor')).toEqual([]);
+    expect(requirementsFor('__proto__')).toEqual([]);
+    expect(requirementsFor('constructor')).toEqual([]);
   });
 });
 
@@ -169,9 +162,7 @@ describe('notification email', () => {
   const inquiry = {
     id: '0190b7c8-0000-7000-8000-000000000001',
     reference: 'HMV-2026-7KQ4XM',
-    goal: 'sourcing',
     productName: 'Dried cassava chips',
-    goods: null,
     company: 'Feed Co\r\nBcc: attacker@example.com',
     contactName: 'An',
     email: 'buyer@example.com',
@@ -180,6 +171,8 @@ describe('notification email', () => {
     destination: 'Qinzhou',
     volumeAmount: '5000',
     volumeUnit: 'MT / month',
+    application: 'Bioethanol',
+    transport: 'Sea freight (FCL)',
     requirements: [{ key: 'starch', label: 'Required starch %', value: '70' }],
     utmSource: 'linkedin',
     referrerOrigin: 'https://www.google.com',
@@ -198,7 +191,12 @@ describe('notification email', () => {
       'Reference: HMV-2026-7KQ4XM',
       'Email: buyer@example.com',
       'Phone: +84 909 000 000',
+      'Product: Dried cassava chips',
+      'Origin: Cambodia',
+      'Destination: Qinzhou',
       'Volume: 5000 MT / month',
+      'Application: Bioethanol',
+      'Transport: Sea freight (FCL)',
       '- Required starch %: 70',
       'Source: utm linkedin',
       'https://cms.example.com/sales/inquiries/0190b7c8-0000-7000-8000-000000000001',
@@ -206,20 +204,16 @@ describe('notification email', () => {
       expect(text).toContain(part);
   });
 
-  it('a goal without a product is named by its goal and goods; the subject never breaks lines', () => {
-    const { subject } = buildInquiryEmail(
-      {
-        ...inquiry,
-        goal: 'customs',
-        productName: null,
-        goods: 'Chemical\nsamples',
-      },
+  it('the subject names the product and never breaks lines; no standalone goal labels', () => {
+    const { subject, text } = buildInquiryEmail(
+      { ...inquiry, productName: 'Dried cassava\nchips' },
       'https://cms.example.com',
     );
     expect(subject).toBe(
-      'New HMV Trade Inquiry — Chemical samples — HMV-2026-7KQ4XM',
+      'New HMV Trade Inquiry — Dried cassava chips — HMV-2026-7KQ4XM',
     );
     expect(subject).not.toMatch(/[\r\n]/);
+    expect(text).not.toMatch(/Product sourcing|Customs & compliance|Request:/);
   });
 
   it('buyer text cannot forge a field line: single values collapse, free text is indented under its field', () => {
@@ -477,7 +471,6 @@ describe('inquiry brief', () => {
   const dto = (over: object) =>
     ({
       locale: 'en',
-      goal: 'sourcing',
       productId: 'dried-cassava-chips',
       requirements: {},
       contact: { company: 'Feed Co', email: 'Buyer@Example.com' },
@@ -508,15 +501,14 @@ describe('inquiry brief', () => {
       { path: 'requirements.admin', message: 'unknown requirement' },
       { path: 'requirements.incoterm', message: 'unknown requirement' },
     ]);
-    expect(
-      issues({ goal: 'customs', productId: 'dried-cassava-chips', goods: ' ' }),
-    ).toEqual([
-      {
-        path: 'productId',
-        message: 'productId is for sourcing inquiries only',
-      },
-      { path: 'goods', message: 'goods is required for this goal' },
-    ]);
+    // Product-led: an unknown or inherited product id is refused.
+    for (const productId of ['__proto__', 'constructor', 'logistics'])
+      expect(issues({ productId })).toEqual([
+        {
+          path: 'productId',
+          message: 'productId must be a Trade Desk product',
+        },
+      ]);
     expect(
       issues({
         origin: 'thailand',
@@ -549,7 +541,6 @@ describe('inquiry brief', () => {
     expect(brief).toMatchObject({
       productId: 'dried-cassava-chips',
       productName: 'Dried cassava chips',
-      goods: null,
       origin: 'Vietnam',
       volumeAmount: '5000',
       volumeUnit: 'MT / month',

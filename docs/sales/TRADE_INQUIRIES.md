@@ -3,6 +3,12 @@
 Buyer inquiries from the public website's HMV Trade Desk are stored in the CMS database and worked in the CMS
 **Sales → Yêu cầu giao thương** screen. PostgreSQL is the system of record; the notification email is a convenience.
 
+HMV's positioning: *Integrated agricultural supply and trade execution* (*Phương án cung ứng và thực thi giao thương
+nông sản xuyên suốt*). Every inquiry is **product-led**: the buyer asks for one HMV product, and logistics and compliance
+are requirements of that product's supply plan (origin, destination and port, volume, transport, Incoterm,
+packaging/loading, delivery window, certification, destination requirements), never inquiries of their own. There is
+no goal or inquiry type, and no free-text goods field.
+
 ```
 Browser ──► www.hmv-global.com/api/inquiry (Next.js, same origin)
               │ validates, then signs a server-to-server request
@@ -27,10 +33,10 @@ Migration `backend/prisma/migrations/20261112090000_trade_inquiries`.
 | `reference` | `HMV-YYYY-XXXXXX`, unique. 6 characters from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (no 0/O/1/I), `crypto.randomInt`, retried on collision. The CMS generates it; the website shows it to the buyer. |
 | `idempotencyKey` | Unique. The website's key for one submission; a repeat returns the same inquiry. Never returned by the admin API. |
 | `status` | `NEW → CONTACTED → QUALIFIED → QUOTED → WON / LOST`. Any transition is allowed (sales corrects mistakes). |
-| `locale`, `goal` | `en`/`vi`; `sourcing`/`logistics`/`customs`. |
-| `productId`, `productName` | Website product id and its English name. No relation to the Commodity/ProductVariant tables. |
-| `goods`, `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's brief. Controlled values are stored as English labels. |
-| `requirements` | JSON array `{key, label, value}` of the answered product/goal requirements, in contract order. |
+| `locale` | `en`/`vi`. |
+| `productId`, `productName` | Required. Website product id and its English name. No relation to the Commodity/ProductVariant tables. |
+| `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` defaults to the product's first origin. |
+| `requirements` | JSON array `{key, label, value}` of the answered product requirements (specification and supply execution), in contract order. |
 | `buyerNotes` | Free text, ≤ 2000. |
 | `company`, `contactName`, `email` (lower-cased), `phone` | Contact. |
 | `landingPage`, `referrerOrigin`, `utmSource/Medium/Campaign` | Path only, origin only, UTM values. No query strings, no full referrer URL, no honeypot value. |
@@ -45,8 +51,10 @@ Indexes: `createdAt`; `(status, createdAt)`; `(assignedToId, status)`; `email`; 
 
 There is no delete endpoint for inquiries or notes.
 
-The product/goal requirement contract (`backend/src/modules/trade-inquiries/inquiry-contract.ts`) mirrors the website's
-`src/features/trade-desk/rules.js`. A website change to products or requirement keys must be made in both.
+The product requirement contract (`backend/src/modules/trade-inquiries/inquiry-contract.ts`) mirrors the website's
+`src/features/trade-desk/rules.js`. A website change to products or requirement keys must be made in both. Priority
+products are passion fruit and dried cassava chips; the other website products are accepted with their own
+specification points plus destination port, delivery window, certification and Incoterm.
 
 ## Roles and permissions
 
@@ -73,7 +81,7 @@ Admin (session cookie + `X-CSRF-Token` on writes):
 
 | Method | Path | Permission |
 | --- | --- | --- |
-| GET | `/api/v1/admin/trade-inquiries?page&pageSize&status&goal&productId&locale&assignedToId&unassigned&dateFrom&dateTo&utmSource&search` | `inquiry:read` |
+| GET | `/api/v1/admin/trade-inquiries?page&pageSize&status&productId&locale&assignedToId&unassigned&dateFrom&dateTo&utmSource&search` | `inquiry:read` |
 | GET | `/api/v1/admin/trade-inquiries/stats` | `inquiry:read` |
 | GET | `/api/v1/admin/trade-inquiries/assignees` | `inquiry:read` |
 | GET | `/api/v1/admin/trade-inquiries/:id` | `inquiry:read` |
@@ -110,12 +118,12 @@ Shared test vector (also in the website's `docs/inbound/TRADE_DESK_DELIVERY.md` 
 secret          hmv-shared-test-vector-secret-0123456789abcdef
 timestamp       1767225600
 idempotencyKey  0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69
-body            {"locale":"en","goal":"customs","goods":"Test cargo","requirements":{},"contact":{"company":"Example Co","email":"buyer@example.com"},"consentAt":"2026-01-01T00:00:00.000Z"}
-bodySha256      f440d4e1f37ac7063006f0ce11896b0eee0632451af410d48ed7c5f5b873dec1
-signature       7c05a879b426c6be25faf502b443dc310a71424044bf4d32b617e137d8d2d920
+body            {"locale":"en","productId":"dried-cassava-chips","origin":"vietnam","destination":"Singapore","volume":{"amount":"5000","unit":"mt_month"},"application":"bioethanol","transport":"sea_fcl","requirements":{},"contact":{"company":"Example Co","email":"buyer@example.com"},"consentAt":"2026-01-01T00:00:00.000Z"}
+bodySha256      20fe22d201ffaf572bf56b405b8e5695a6e8f270f1312238c40cc078e7431d9c
+signature       37a0452e58562fb1d41ff58ad73f4cc362cd6586e529d2b958476a905d5f4d91
 ```
 
-(`body` is the exact string: no trailing newline. Signed string: `1767225600.0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69.f440d4e1…dec1`.)
+(`body` is the exact string: no trailing newline. Signed string: `1767225600.0f3b6d2e-1c4a-4e8b-9a77-2f1d3c4b5a69.20fe22d2…1d9c`. The body is a valid inquiry: the CMS accepts it.)
 
 Responses:
 
@@ -132,7 +140,8 @@ Idempotency is the unique `idempotencyKey` column, so concurrent repeats of one 
 ## Notification email
 
 After the inquiry is committed, one email goes to `INQUIRY_NOTIFY_TO` (SMTP via nodemailer, 2 s connect/greeting,
-2.5 s socket, 2.5 s overall). Subject `New HMV Trade Inquiry — <product or goods> — <reference>`, plain-text summary,
+2.5 s socket, 2.5 s overall). Subject `New HMV Trade Inquiry — <product> — <reference>`, a plain-text summary of the product requirement (product,
+origin, destination, volume, application, transport, then the answered requirements),
 link to `CMS_PUBLIC_URL/sales/inquiries/<id>`. Buyer values are display-formatted: single-value fields are collapsed to
 one line, free-text requirement values keep their lines indented under the field, so buyer text can never start a line
 that looks like a field of the email. The saved inquiry is unchanged.
@@ -200,6 +209,42 @@ get 401 in between, and the website shows its retry/email fallback.
    thoại**, or **Mở WhatsApp** (only for numbers given with a country code). Nothing is sent automatically.
 3. Move the status as the deal progresses; record calls and agreements as notes.
 4. The "Chưa cung cấp" line lists core details the buyer left empty — ask for them on first contact.
+
+The inbox lists reference and time, company and contact, product, destination, volume, status, email state, assignee
+and source, and filters by status, product, assignee, date, `utm_source` and search. An inquiry page shows the buyer
+and contact; the commercial requirement (product, origin, destination, volume, application, transport, product
+specification); the supply execution requirements (packaging/loading, Incoterm, destination port, certification,
+destination requirements, delivery window) — only what the buyer gave; sales handling (status, assignee, email state,
+internal notes); and attribution (landing page, referrer origin, UTM).
+
+## Local development: the migration was edited before release
+
+`20261112090000_trade_inquiries` was changed on its branch before any deployment (product required, no `goal` or
+`goods` column, `SENDING` notification state). A test database is recreated as usual. A **developer database that
+already applied an earlier version** fails `prisma migrate dev`/`deploy` with a checksum mismatch; nothing is changed
+automatically. Either:
+
+- **Keep the data** — run against that database only, after a backup (`pg_dump`):
+
+  ```sql
+  ALTER TYPE "InquiryNotificationStatus" ADD VALUE IF NOT EXISTS 'SENDING' BEFORE 'SENT';
+  -- Inquiries without a product cannot be kept as they are: review them first.
+  SELECT "reference", "goal", "goods" FROM "trade_inquiries" WHERE "productId" IS NULL;
+  -- Then, for each: set a product (e.g. UPDATE ... SET "productId" = 'nuts', "productName" = 'Cashew nuts' WHERE
+  -- "reference" = '...'), or delete it yourself (its notes go with it).
+  ALTER TABLE "trade_inquiries"
+    DROP COLUMN IF EXISTS "goal",
+    DROP COLUMN IF EXISTS "goods",
+    ALTER COLUMN "productId" SET NOT NULL,
+    ALTER COLUMN "productName" SET NOT NULL;
+  -- Forget the old checksum; Prisma records the current file's in the next step.
+  DELETE FROM "_prisma_migrations" WHERE "migration_name" = '20261112090000_trade_inquiries';
+  ```
+
+  then `pnpm --filter backend exec prisma migrate resolve --applied 20261112090000_trade_inquiries` and check with
+  `pnpm --filter backend exec prisma migrate status`.
+- **Discard the data** — only if that is your choice: `pnpm --filter backend exec prisma migrate reset` (drops and
+  recreates the whole development database, then seeds it).
 
 ## Before production
 

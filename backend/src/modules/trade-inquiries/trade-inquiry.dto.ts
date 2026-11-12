@@ -19,7 +19,7 @@ import {
   isISO8601,
 } from 'class-validator';
 import { PageMeta, PageQuery, UserRef } from '../../common/dto';
-import { INQUIRY_GOALS, INQUIRY_LOCALES } from './inquiry-contract';
+import { INQUIRY_LOCALES } from './inquiry-contract';
 
 // ---------- Ingestion (website server → CMS) ----------
 // Lengths and formats match or are stricter than the website's validation (src/features/trade-desk/validation.js).
@@ -137,23 +137,12 @@ export class IngestTradeInquiryDto {
   @IsIn(INQUIRY_LOCALES)
   locale: (typeof INQUIRY_LOCALES)[number];
 
-  @IsIn(INQUIRY_GOALS)
-  goal: (typeof INQUIRY_GOALS)[number];
-
-  /** Website product id; required for sourcing. */
-  @IsOptional()
+  /** Website product id: every inquiry is for one HMV product. Checked against the contract. */
   @IsString()
   @MaxLength(64)
-  productId?: string | null;
+  productId: string;
 
-  /** Cargo or goods description; required for logistics and customs. */
-  @IsOptional()
-  @IsString()
-  @Transform(trim)
-  @MaxLength(200)
-  goods?: string;
-
-  /** Sourcing: an origin id ("vietnam"); otherwise free text. */
+  /** An origin id the product offers ("vietnam"); the product's first origin when left out. */
   @IsOptional()
   @IsString()
   @Transform(trim)
@@ -230,11 +219,6 @@ export class TradeInquiryListQuery extends PageQuery {
   status?: TradeInquiryStatus;
 
   @IsOptional()
-  @IsIn(INQUIRY_GOALS)
-  @ApiPropertyOptional({ enum: INQUIRY_GOALS })
-  goal?: string;
-
-  @IsOptional()
   @IsString()
   @MaxLength(64)
   productId?: string;
@@ -284,10 +268,8 @@ export class TradeInquirySummary {
   status: TradeInquiryStatus;
   createdAt: Date;
   locale: string;
-  goal: string;
-  productId: string | null;
-  productName: string | null;
-  goods: string | null;
+  productId: string;
+  productName: string;
   destination: string | null;
   volumeAmount: string | null;
   volumeUnit: string | null;

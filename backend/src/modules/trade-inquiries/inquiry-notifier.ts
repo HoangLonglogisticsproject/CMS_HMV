@@ -27,9 +27,7 @@ export const NOTIFY_TIMEOUT_MS = 2_500;
 export interface InquiryForEmail {
   id: string;
   reference: string;
-  goal: string;
-  productName: string | null;
-  goods: string | null;
+  productName: string;
   company: string;
   contactName: string | null;
   email: string;
@@ -38,17 +36,14 @@ export interface InquiryForEmail {
   destination: string | null;
   volumeAmount: string | null;
   volumeUnit: string | null;
+  application: string | null;
+  transport: string | null;
   requirements: StoredRequirement[];
   utmSource: string | null;
   referrerOrigin: string | null;
   landingPage: string | null;
 }
 
-const GOAL_LABEL: Record<string, string> = {
-  sourcing: 'Product sourcing',
-  logistics: 'Logistics',
-  customs: 'Customs & compliance',
-};
 // Line breaks a mail client may render: CR, LF, VT, FF, NEL and the Unicode line/paragraph separators.
 const BREAK = /\r\n|[\r\n\v\f\u0085\u2028\u2029]/;
 
@@ -67,14 +62,11 @@ const indented = (s: string) =>
     .map((l) => l.replace(/[^\S\n]+/g, ' ').trim())
     .join('\n    ');
 
-/** The sales summary email: plain text, so buyer input is never rendered as HTML. */
+/** The sales summary email: the product requirement and its supply plan, plain text (buyer input never rendered as HTML). */
 export function buildInquiryEmail(
   inquiry: InquiryForEmail,
   cmsPublicUrl: string,
 ): InquiryEmail {
-  const what =
-    inquiry.productName ??
-    (inquiry.goods || GOAL_LABEL[inquiry.goal] || inquiry.goal);
   // Display formatting only: the saved inquiry keeps the buyer's text as sent.
   const line = (label: string, value: string | null | undefined) =>
     value && oneLine(value) ? [`${label}: ${oneLine(value)}`] : [];
@@ -96,15 +88,12 @@ export function buildInquiryEmail(
     ...line('Buyer', inquiry.contactName),
     ...line('Email', inquiry.email),
     ...line('Phone', inquiry.phone),
-    ...line(
-      'Request',
-      inquiry.goal === 'sourcing'
-        ? what
-        : `${GOAL_LABEL[inquiry.goal] ?? inquiry.goal}: ${what}`,
-    ),
+    ...line('Product', inquiry.productName),
     ...line('Origin', inquiry.origin),
     ...line('Destination', inquiry.destination),
     ...line('Volume', volume),
+    ...line('Application', inquiry.application),
+    ...line('Transport', inquiry.transport),
     ...(inquiry.requirements.length
       ? [
           '',
@@ -119,7 +108,9 @@ export function buildInquiryEmail(
     `Open in the CMS: ${cmsPublicUrl}/sales/inquiries/${inquiry.id}`,
   ].join('\n');
   return {
-    subject: oneLine(`New HMV Trade Inquiry — ${what} — ${inquiry.reference}`),
+    subject: oneLine(
+      `New HMV Trade Inquiry — ${inquiry.productName} — ${inquiry.reference}`,
+    ),
     text,
   };
 }

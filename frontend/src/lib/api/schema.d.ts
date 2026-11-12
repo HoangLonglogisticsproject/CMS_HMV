@@ -1311,13 +1311,9 @@ export interface components {
             };
             /** @enum {string} */
             locale: "en" | "vi";
-            /** @enum {string} */
-            goal: "sourcing" | "logistics" | "customs";
-            /** @description Website product id; required for sourcing. */
-            productId?: string | null;
-            /** @description Cargo or goods description; required for logistics and customs. */
-            goods?: string;
-            /** @description Sourcing: an origin id ("vietnam"); otherwise free text. */
+            /** @description Website product id: every inquiry is for one HMV product. Checked against the contract. */
+            productId: string;
+            /** @description An origin id the product offers ("vietnam"); the product's first origin when left out. */
             origin?: string;
             destination?: string;
             volume?: components["schemas"]["InquiryVolumeDto"];
@@ -1347,10 +1343,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             locale: string;
-            goal: string;
-            productId: string | null;
-            productName: string | null;
-            goods: string | null;
+            productId: string;
+            productName: string;
             destination: string | null;
             volumeAmount: string | null;
             volumeUnit: string | null;
@@ -1403,10 +1397,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             locale: string;
-            goal: string;
-            productId: string | null;
-            productName: string | null;
-            goods: string | null;
+            productId: string;
+            productName: string;
             destination: string | null;
             volumeAmount: string | null;
             volumeUnit: string | null;
@@ -3762,7 +3754,6 @@ export interface operations {
                 page?: number;
                 pageSize?: number;
                 status?: components["schemas"]["TradeInquiryStatus"];
-                goal?: "sourcing" | "logistics" | "customs";
                 locale?: "en" | "vi";
                 productId?: string;
                 assignedToId?: string;
