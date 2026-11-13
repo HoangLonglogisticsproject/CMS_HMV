@@ -25,9 +25,12 @@ import {
   NOTIFICATION_LABEL,
   NOTIFICATION_SHORT,
   PRODUCT_LABEL,
+  ROUTE_LABEL,
+  ROUTE_VARIANT,
   STATUS_LABEL,
   STATUS_VARIANT,
   formatVietnamDateTime,
+  inquiryRoute,
   inquirySource,
   inquiryVolume,
   settledPage,
@@ -37,21 +40,18 @@ const PAGE_SIZE = 20;
 const SELECT =
   "h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#087EC2]";
 
-/** The inbox columns: pure render functions of a row, no component state. */
+/** The inbox columns, commercial information first: pure render functions of a row, no component state. */
 const columns: ColumnDef<InquirySummary>[] = [
   {
     id: "reference",
-    header: "Mã / nhận lúc",
+    header: "Mã",
     cell: ({ row }) => (
-      <div className="whitespace-nowrap">
-        <Link
-          href={`/sales/inquiries/${row.original.id}`}
-          className="font-mono font-semibold text-[#087EC2] hover:underline"
-        >
-          {row.original.reference}
-        </Link>
-        <div className="text-[11px] text-slate-500">{formatVietnamDateTime(row.original.createdAt)}</div>
-      </div>
+      <Link
+        href={`/sales/inquiries/${row.original.id}`}
+        className="font-mono font-semibold text-[#087EC2] hover:underline whitespace-nowrap"
+      >
+        {row.original.reference}
+      </Link>
     ),
   },
   {
@@ -72,7 +72,7 @@ const columns: ColumnDef<InquirySummary>[] = [
     id: "product",
     header: "Sản phẩm",
     cell: ({ row }) => (
-      <div className="min-w-0 max-w-[180px]">
+      <div className="min-w-0 max-w-[160px]">
         <div className="text-slate-800 truncate" title={row.original.productName}>
           {row.original.productName}
         </div>
@@ -84,7 +84,7 @@ const columns: ColumnDef<InquirySummary>[] = [
     id: "destination",
     header: "Điểm đến",
     cell: ({ row }) => (
-      <div className="max-w-[120px] truncate text-slate-700" title={row.original.destination ?? undefined}>
+      <div className="max-w-[130px] truncate text-slate-700" title={row.original.destination ?? undefined}>
         {row.original.destination ?? "—"}
       </div>
     ),
@@ -97,24 +97,24 @@ const columns: ColumnDef<InquirySummary>[] = [
     ),
   },
   {
+    id: "route",
+    header: "Tuyến xử lý",
+    cell: ({ row }) => {
+      const route = inquiryRoute(row.original);
+      return (
+        <Badge variant={ROUTE_VARIANT[route]} className="whitespace-nowrap" data-testid="inquiry-route">
+          {ROUTE_LABEL[route]}
+        </Badge>
+      );
+    },
+  },
+  {
     id: "status",
     header: "Trạng thái",
     cell: ({ row }) => (
       <Badge variant={STATUS_VARIANT[row.original.status]} className="whitespace-nowrap">
         {STATUS_LABEL[row.original.status]}
       </Badge>
-    ),
-  },
-  {
-    id: "notification",
-    header: "Email",
-    cell: ({ row }) => (
-      <span
-        className="text-[11px] text-slate-500 whitespace-nowrap"
-        title={NOTIFICATION_LABEL[row.original.notificationStatus]}
-      >
-        {NOTIFICATION_SHORT[row.original.notificationStatus]}
-      </span>
     ),
   },
   {
@@ -132,6 +132,19 @@ const columns: ColumnDef<InquirySummary>[] = [
     header: "Nguồn",
     cell: ({ row }) => (
       <div className="max-w-[110px] truncate text-[11px] text-slate-500">{inquirySource(row.original)}</div>
+    ),
+  },
+  {
+    id: "received",
+    header: "Nhận lúc",
+    // The notification email is secondary to the lead: a muted line under the time.
+    cell: ({ row }) => (
+      <div className="whitespace-nowrap">
+        <div className="text-slate-700">{formatVietnamDateTime(row.original.createdAt)}</div>
+        <div className="text-[10px] text-slate-400" title={NOTIFICATION_LABEL[row.original.notificationStatus]}>
+          Email: {NOTIFICATION_SHORT[row.original.notificationStatus]}
+        </div>
+      </div>
     ),
   },
 ];
@@ -234,11 +247,12 @@ function InquiryInbox() {
           <div className="p-1.5 rounded-lg bg-[#E9F7FF] text-[#087EC2]">
             <Inbox className="h-4 w-4" />
           </div>
-          <h1 className="text-base font-bold text-[#123D68]">Yêu cầu giao thương</h1>
+          <h1 className="text-base font-bold text-[#123D68]">Leads &amp; Yêu cầu giao thương</h1>
           {isFetching && !isLoading && <span className="text-[10px] text-slate-400">Đang cập nhật…</span>}
         </div>
         <p className="text-xs text-slate-500 mt-1">
-          Yêu cầu người mua gửi qua HMV Trade Desk trên website. Danh sách tự làm mới mỗi 30 giây khi tab đang mở.
+          Lead từ HMV Trade Desk trên website: đủ sản phẩm, điểm đến và khối lượng là <strong>Sales · RFQ</strong>; còn
+          lại là <strong>Customer Service</strong>. Danh sách tự làm mới mỗi 30 giây khi tab đang mở.
         </p>
       </div>
 

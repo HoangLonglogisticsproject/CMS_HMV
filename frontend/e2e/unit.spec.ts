@@ -18,9 +18,10 @@ import {
   formatVietnamDateTime,
   inquirySource,
   inquiryVolume,
+  inquiryRoute,
   noteAfterSave,
+  ROUTE_LABEL,
   settledPage,
-  splitRequirements,
   whatsAppLink,
 } from "@/modules/sales/utils/inquiry-format";
 
@@ -244,14 +245,21 @@ test.describe("sales inbox formatting", () => {
     referrerOrigin: null,
   };
 
-  test("requirements: product specification apart from supply execution, each in stored order", () => {
-    const r = (key: string) => ({ key, label: key, value: "x" });
-    const { specification, execution } = splitRequirements(
-      ["starch", "moisture", "loading", "incoterm", "destinationPort", "deliveryWindow", "spec-kernel-grade", "spec-packaging"].map(r),
-    );
-    expect(specification.map((x) => x.key)).toEqual(["starch", "moisture", "spec-kernel-grade"]);
-    expect(execution.map((x) => x.key)).toEqual(["loading", "incoterm", "destinationPort", "deliveryWindow", "spec-packaging"]);
-    expect(splitRequirements([])).toEqual({ specification: [], execution: [] });
+  test("route: product, destination and volume make a Sales RFQ; anything less is Customer Service", () => {
+    const lead = { productName: "Dried cassava chips", destination: "Chennai, India", volumeAmount: "2,000" };
+    expect(inquiryRoute(lead)).toBe("rfq");
+    expect(ROUTE_LABEL[inquiryRoute(lead)]).toBe("Sales · RFQ");
+    for (const incomplete of [
+      { ...lead, destination: null },
+      { ...lead, destination: "   " },
+      { ...lead, volumeAmount: null },
+      { ...lead, volumeAmount: "" },
+      { ...lead, productName: "" },
+      { productName: "Passion fruit", destination: null, volumeAmount: null },
+    ]) {
+      expect(inquiryRoute(incomplete)).toBe("discovery");
+    }
+    expect(ROUTE_LABEL.discovery).toBe("Customer Service");
   });
 
   test("volume and source", () => {

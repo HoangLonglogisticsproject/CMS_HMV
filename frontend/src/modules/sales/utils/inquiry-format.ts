@@ -25,6 +25,19 @@ export const STATUS_VARIANT: Record<Status, NonNullable<BadgeProps["variant"]>> 
   LOST: "outline",
 };
 
+/**
+ * Who works a lead, derived from what it stores (never a stored field, never a status change): product, destination
+ * and volume known is a quotation request for Sales (the website's "ready for quotation"); anything less is a buyer
+ * still clarifying the requirement, for Customer Service.
+ */
+export type InquiryRoute = "rfq" | "discovery";
+const given = (value: string | null | undefined) => Boolean(value?.trim());
+export const inquiryRoute = (i: { productName: string; destination: string | null; volumeAmount: string | null }): InquiryRoute =>
+  given(i.productName) && given(i.destination) && given(i.volumeAmount) ? "rfq" : "discovery";
+
+export const ROUTE_LABEL: Record<InquiryRoute, string> = { rfq: "Sales · RFQ", discovery: "Customer Service" };
+export const ROUTE_VARIANT: Record<InquiryRoute, NonNullable<BadgeProps["variant"]>> = { rfq: "success", discovery: "warning" };
+
 /** Website product ids (the ingestion contract); the stored productName stays in English as the buyer saw it. */
 export const PRODUCT_LABEL: Record<string, string> = {
   "passion-fruit": "Chanh dây",
@@ -52,27 +65,6 @@ export const NOTIFICATION_SHORT: Record<NotificationStatus, string> = {
   FAILED: "Gửi lỗi",
   SKIPPED: "Đang tắt",
 };
-
-/** Requirement keys of the supply execution (packing, terms, route, compliance, timing); the others specify the product. */
-const EXECUTION_KEYS = new Set([
-  "packaging",
-  "loading",
-  "incoterm",
-  "certification",
-  "deliveryWindow",
-  "destinationPort",
-  "destinationRequirements",
-  "spec-packaging",
-  "spec-carton-weight",
-  "spec-cold-chain",
-  "spec-destination-requirements",
-]);
-
-/** The buyer's answered requirements, in their stored order: product specification, then supply execution. */
-export const splitRequirements = <T extends { key: string }>(requirements: readonly T[]) => ({
-  specification: requirements.filter((r) => !EXECUTION_KEYS.has(r.key)),
-  execution: requirements.filter((r) => EXECUTION_KEYS.has(r.key)),
-});
 
 interface Brief {
   volumeAmount: string | null;
