@@ -73,7 +73,7 @@ export const TARGET_NAVIGATION_IA: NavGroupConfig[] = [
     items: [
       {
         id: "inquiries",
-        title: "Yêu cầu giao thương",
+        title: "Leads & CRM",
         href: "/sales/inquiries",
         icon: Inbox,
         permission: "inquiry:read",

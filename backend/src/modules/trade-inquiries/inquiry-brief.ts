@@ -37,21 +37,24 @@ function resolveProduct(dto: IngestTradeInquiryDto) {
   return { product, issues };
 }
 
-/** One of the product's origins (its first by default), as a label. */
+/**
+ * The origin the buyer gave, as a label: null when none was given (never assumed: the Trade Desk does not ask it),
+ * an issue when the product is not offered from it.
+ */
 function resolveOrigin(
   dto: IngestTradeInquiryDto,
   product: ProductRule | undefined,
 ) {
   const origin = blankToNull(dto.origin);
-  if (!product) return { origin, issues: [] };
-  const issues: Issue[] =
-    origin && !product.origins.includes(origin)
-      ? [{ path: 'origin', message: 'origin is not offered for this product' }]
-      : [];
-  return {
-    origin: lookup(ORIGINS, origin ?? product.origins[0]) ?? null,
-    issues,
-  };
+  if (!origin || !product) return { origin: null, issues: [] };
+  if (!product.origins.includes(origin))
+    return {
+      origin: null,
+      issues: [
+        { path: 'origin', message: 'origin is not offered for this product' },
+      ],
+    };
+  return { origin: lookup(ORIGINS, origin) ?? null, issues: [] };
 }
 
 /** An optional controlled answer as its label: null when blank, an issue when not one of the table's keys. */

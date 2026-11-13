@@ -1313,7 +1313,7 @@ export interface components {
             locale: "en" | "vi";
             /** @description Website product id: every inquiry is for one HMV product. Checked against the contract. */
             productId: string;
-            /** @description An origin id the product offers ("vietnam"); the product's first origin when left out. */
+            /** @description An origin id the product offers ("vietnam"), when the buyer gave one; left out, no origin is stored. */
             origin?: string;
             destination?: string;
             volume?: components["schemas"]["InquiryVolumeDto"];

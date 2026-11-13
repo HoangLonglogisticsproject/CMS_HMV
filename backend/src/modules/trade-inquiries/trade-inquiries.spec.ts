@@ -571,7 +571,21 @@ describe('inquiry brief', () => {
     ]);
   });
 
-  it('stores labels, the contract order, the default origin and unit; blank answers are left out', () => {
+  it('an origin only when the buyer gave one: omitted or blank is null, never a default', () => {
+    expect(buildBrief(dto({})).origin).toBeNull();
+    expect(buildBrief(dto({ origin: '  ' })).origin).toBeNull();
+    expect(buildBrief(dto({ origin: 'vietnam' })).origin).toBe('Vietnam');
+    expect(buildBrief(dto({ origin: 'cambodia' })).origin).toBe('Cambodia');
+    // Cambodia is offered for dried cassava chips only.
+    expect(
+      buildBrief(dto({ productId: 'passion-fruit', origin: 'vietnam' })).origin,
+    ).toBe('Vietnam');
+    expect(issues({ productId: 'passion-fruit', origin: 'cambodia' })).toEqual([
+      { path: 'origin', message: 'origin is not offered for this product' },
+    ]);
+  });
+
+  it('stores labels, the contract order and the default unit; no origin is assumed; blank answers are left out', () => {
     const brief = buildBrief(
       dto({
         volume: { amount: ' 5000 ', unit: 'mt_month' },
@@ -582,7 +596,7 @@ describe('inquiry brief', () => {
     expect(brief).toMatchObject({
       productId: 'dried-cassava-chips',
       productName: 'Dried cassava chips',
-      origin: 'Vietnam',
+      origin: null,
       volumeAmount: '5000',
       volumeUnit: 'MT / month',
       application: 'Animal feed',

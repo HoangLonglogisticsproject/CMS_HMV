@@ -22,14 +22,17 @@ import {
 import {
   INQUIRY_STATUSES,
   NOTIFICATION_LABEL,
+  ROUTE_LABEL,
+  ROUTE_VARIANT,
   STATUS_LABEL,
   STATUS_VARIANT,
   buyerMailto,
   formatVietnamDateTime,
+  hasAdditionalBuyerInformation,
+  inquiryRoute,
   inquirySource,
   inquiryVolume,
   noteAfterSave,
-  splitRequirements,
   whatsAppLink,
 } from "../utils/inquiry-format";
 
@@ -67,7 +70,7 @@ function InquiryDetailLoader({ inquiryId }: Readonly<{ inquiryId: string }>) {
 function BackLink() {
   return (
     <Link href="/sales/inquiries" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#087EC2]">
-      <ArrowLeft className="h-3.5 w-3.5" /> Yêu cầu giao thương
+      <ArrowLeft className="h-3.5 w-3.5" /> Leads &amp; CRM
     </Link>
   );
 }
@@ -90,59 +93,61 @@ function Field({ label, value }: Readonly<{ label: string; value: React.ReactNod
   );
 }
 
-/** B. the product requirement and C. its supply execution: only what the buyer gave, nothing filled in. */
-function RequirementSections({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
-  const volume = inquiryVolume(inquiry);
-  const { specification, execution } = splitRequirements(inquiry.requirements);
-  const missing = [
-    ["Người liên hệ", inquiry.contactName],
-    ["Số điện thoại", inquiry.phone],
-    ["Xuất xứ", inquiry.origin],
-    ["Điểm đến", inquiry.destination],
-    ["Khối lượng", volume],
-  ]
-    .filter(([, v]) => !v)
-    .map(([label]) => label);
-
+/** The lead at a glance: who, what, where, how much, and who works it. */
+function LeadSummary({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
+  const route = inquiryRoute(inquiry);
   return (
-    <>
-      <Section title="Yêu cầu thương mại">
-        <dl className="space-y-1.5">
-          <Field label="Sản phẩm" value={inquiry.productName} />
-          <Field label="Xuất xứ" value={inquiry.origin} />
-          <Field label="Điểm đến" value={inquiry.destination} />
-          <Field label="Khối lượng" value={volume} />
-          <Field label="Ứng dụng" value={inquiry.application} />
-          <Field label="Vận chuyển" value={inquiry.transport} />
-          {specification.map((r) => (
-            <Field key={r.key} label={r.label} value={r.value} />
-          ))}
-        </dl>
-        {inquiry.buyerNotes && (
-          <div className="rounded-md bg-slate-50 border border-slate-100 p-3 text-xs text-slate-800 whitespace-pre-wrap">
-            {inquiry.buyerNotes}
-          </div>
-        )}
-        {missing.length > 0 && (
-          <p className="text-[11px] text-amber-700" data-testid="inquiry-missing">
-            Chưa cung cấp — cần hỏi thêm: {missing.join(", ")}.
-          </p>
-        )}
-      </Section>
+    <Card className="p-4 border-slate-200 shadow-2xs bg-white space-y-3" data-testid="inquiry-summary">
+      <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        <Field label="Công ty" value={inquiry.company} />
+        <Field label="Người mua" value={inquiry.contactName} />
+        <Field label="Sản phẩm" value={inquiry.productName} />
+        <Field label="Điểm đến" value={inquiry.destination} />
+        <Field label="Khối lượng" value={inquiryVolume(inquiry)} />
+        <Field label="Nhận lúc" value={formatVietnamDateTime(inquiry.createdAt)} />
+      </dl>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          Tuyến xử lý
+          <Badge variant={ROUTE_VARIANT[route]} data-testid="inquiry-route">{ROUTE_LABEL[route]}</Badge>
+        </span>
+        <span className="flex items-center gap-1.5">
+          Trạng thái
+          <Badge variant={STATUS_VARIANT[inquiry.status]} data-testid="inquiry-status">{STATUS_LABEL[inquiry.status]}</Badge>
+        </span>
+        <span>
+          Phụ trách:{" "}
+          <strong className="font-semibold text-slate-800" data-testid="inquiry-assignee">
+            {inquiry.assignedTo?.displayName ?? "Chưa giao"}
+          </strong>
+        </span>
+      </div>
+    </Card>
+  );
+}
 
-      <Section title="Yêu cầu thực thi cung ứng">
-        {execution.length === 0 && (
-          <p className="text-xs text-slate-400" data-testid="inquiry-execution-empty">
-            Người mua chưa nêu yêu cầu về đóng gói, điều kiện giao hàng, chứng nhận hay thời gian giao.
-          </p>
-        )}
-        <dl className="space-y-1.5" data-testid="inquiry-execution">
-          {execution.map((r) => (
+/**
+ * What earlier, longer Trade Desk inquiries asked (application, transport, product and supply requirements): kept as
+ * the buyer gave it, folded away. Today's desk asks none of it, so a new lead has no such section.
+ */
+function AdditionalBuyerInformation({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
+  if (!hasAdditionalBuyerInformation(inquiry)) return null;
+  return (
+    <Card className="border-slate-200 shadow-2xs bg-white">
+      <details data-testid="inquiry-additional">
+        <summary className="cursor-pointer select-none p-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          Additional buyer information
+        </summary>
+        <dl className="space-y-1.5 px-4 pb-4">
+          <Field label="Xuất xứ" value={inquiry.origin} />
+          {inquiry.application && <Field label="Ứng dụng" value={inquiry.application} />}
+          {inquiry.transport && <Field label="Vận chuyển" value={inquiry.transport} />}
+          {inquiry.requirements.map((r) => (
             <Field key={r.key} label={r.label} value={r.value} />
           ))}
         </dl>
-      </Section>
-    </>
+      </details>
+    </Card>
   );
 }
 
@@ -180,15 +185,8 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
           <h1 className="text-base font-bold text-[#123D68] font-mono" data-testid="inquiry-reference">
             {inquiry.reference}
           </h1>
-          <Badge variant={STATUS_VARIANT[inquiry.status]} data-testid="inquiry-status">
-            {STATUS_LABEL[inquiry.status]}
-          </Badge>
           <Badge variant="outline">{inquiry.locale.toUpperCase()}</Badge>
         </div>
-        <p className="text-xs text-slate-600">
-          <strong className="text-slate-900">{inquiry.company}</strong> · {inquiry.productName} · nhận lúc{" "}
-          {formatVietnamDateTime(inquiry.createdAt)}
-        </p>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="h-8 text-xs bg-[#087EC2] hover:bg-[#066ba8] text-white gap-1.5">
             <a href={buyerMailto(inquiry.email, inquiry.reference, inquiry.productName)}>
@@ -210,8 +208,18 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
         </div>
       </div>
 
+      <LeadSummary inquiry={inquiry} />
+
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
+          {inquiry.buyerNotes && (
+            <Section title="Lời nhắn của người mua">
+              <p className="text-xs text-slate-800 whitespace-pre-wrap" data-testid="inquiry-buyer-notes">
+                {inquiry.buyerNotes}
+              </p>
+            </Section>
+          )}
+
           <Section title="Người mua / liên hệ">
             <dl className="space-y-1.5">
               <Field label="Công ty" value={inquiry.company} />
@@ -222,7 +230,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
             </dl>
           </Section>
 
-          <RequirementSections inquiry={inquiry} />
+          <AdditionalBuyerInformation inquiry={inquiry} />
 
           <Section title="Ghi chú nội bộ">
             {inquiry.notes.length === 0 && <p className="text-xs text-slate-400">Chưa có ghi chú.</p>}

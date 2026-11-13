@@ -4,8 +4,9 @@ import { E2E } from "./env";
 import { apiAs, loginViaUi, publicApi } from "./helpers";
 
 // The website side of the integration, as its server adapter sends it: the body serialized once, and that exact string
-// signed (HMAC-SHA256 of "<timestamp>.<idempotency key>.<SHA-256 of the body>") and sent.
-async function ingestInquiry(company: string) {
+// signed (HMAC-SHA256 of "<timestamp>.<idempotency key>.<SHA-256 of the body>") and sent. The default body is an earlier,
+// longer Trade Desk inquiry (application and requirements, no destination): kept as historical data.
+async function ingestInquiry(company: string, over: Record<string, unknown> = {}) {
   const key = randomUUID();
   const ts = String(Math.floor(Date.now() / 1000));
   const body = JSON.stringify({
@@ -19,6 +20,7 @@ async function ingestInquiry(company: string) {
       contact: { company, email: "buyer@example.com", phone: "+84 909 000 000" },
       source: { landingPage: "/products/dried-cassava-chips", utm: { source: "linkedin" } },
       consentAt: new Date().toISOString(),
+      ...over,
   });
   const bodyHash = createHash("sha256").update(body).digest("hex");
   const ctx = await publicApi();
@@ -37,12 +39,93 @@ async function ingestInquiry(company: string) {
   return reference;
 }
 
-test("a website inquiry reaches the sales inbox; sales qualifies, assigns and notes it", async ({ page }) => {
+/** What today's chat-first Trade Desk sends for a buyer ready for quotation: product, destination and volume only. */
+const rfqReady = {
+  origin: undefined,
+  destination: "Chennai, India",
+  volume: { amount: "2,000", unit: "mt_month" },
+  application: undefined,
+  requirements: {},
+  notes: undefined,
+};
+
+test("Leads & CRM: a complete lead is a Sales RFQ, an incomplete one goes to Customer Service; the status is untouched", async ({ page }) => {
+  const prefix = `Route ${randomUUID().slice(0, 8)}`;
+  const rfq = await ingestInquiry(`${prefix} RFQ`, rfqReady);
+  const discovery = await ingestInquiry(`${prefix} Explore`, { ...rfqReady, destination: undefined, volume: undefined });
+
+  await loginViaUi(page, "sales", "/sales/inquiries");
+  await expect(page.getByRole("heading", { name: "Leads & Yêu cầu giao thương" })).toBeVisible();
+  await expect(page.locator("thead th")).toHaveText([
+    "Mã", "Công ty / người mua", "Sản phẩm", "Điểm đến", "Khối lượng", "Tuyến xử lý", "Trạng thái", "Phụ trách", "Nguồn", "Nhận lúc",
+  ]);
+  await page.getByLabel("Tìm yêu cầu").fill(prefix);
+  const rfqRow = page.getByTestId("inquiry-row").filter({ hasText: rfq });
+  const discoveryRow = page.getByTestId("inquiry-row").filter({ hasText: discovery });
+  await expect(rfqRow.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
+  await expect(rfqRow).toContainText("Chennai, India");
+  await expect(rfqRow).toContainText("2,000 MT / month");
+  await expect(discoveryRow.getByTestId("inquiry-route")).toHaveText("Customer Service");
+  // The route is derived, not a status: both leads are still new.
+  await expect(rfqRow).toContainText("Mới");
+  await expect(discoveryRow).toContainText("Mới");
+
+  await rfqRow.getByRole("link", { name: rfq }).click();
+  const summary = page.getByTestId("inquiry-summary");
+  await expect(summary).toContainText(`${prefix} RFQ`);
+  await expect(summary).toContainText("Dried cassava chips");
+  await expect(summary).toContainText("Chennai, India");
+  await expect(summary).toContainText("2,000 MT / month");
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
+  await expect(page.getByTestId("inquiry-status")).toHaveText("Mới");
+  await expect(page.getByTestId("inquiry-assignee")).toHaveText("Chưa giao");
+  // Nothing the buyer was never asked: no missing-information list, no historical section.
+  await expect(page.getByTestId("inquiry-additional")).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(/Chưa cung cấp|cần hỏi thêm|moisture|Incoterm|Vận chuyển/i);
+
+  await page.goto("/sales/inquiries");
+  await page.getByLabel("Tìm yêu cầu").fill(prefix);
+  await discoveryRow.getByRole("link", { name: discovery }).click();
+  // The lead page, not the list it came from (whose rows also carry route badges).
+  await expect(summary).toContainText(`${prefix} Explore`);
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Customer Service");
+  await expect(summary).toContainText("Điểm đến—");
+
+  const api = await apiAs("sales");
+  const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${encodeURIComponent(prefix)}`);
+  expect(items.map((i: { status: string }) => i.status)).toEqual(["NEW", "NEW"]);
+  await api.dispose();
+});
+
+test("an admin has Leads & CRM too", async ({ page }) => {
+  await loginViaUi(page, "admin", "/sales/inquiries");
+  await expect(page.locator("aside").getByRole("link", { name: "Leads & CRM" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Leads & Yêu cầu giao thương" })).toBeVisible();
+});
+
+test("an earlier lead with only an origin keeps it, under Additional buyer information, not in the summary", async ({ page }) => {
+  const reference = await ingestInquiry(`Origin Only ${randomUUID().slice(0, 8)}`, { ...rfqReady, origin: "cambodia" });
+  const api = await apiAs("sales");
+  const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${reference}`);
+  await api.dispose();
+
+  await loginViaUi(page, "sales", `/sales/inquiries/${items[0].id}`);
+  const summary = page.getByTestId("inquiry-summary");
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
+  await expect(summary).not.toContainText("Cambodia");
+  const additional = page.getByTestId("inquiry-additional");
+  await expect(additional).toBeVisible();
+  await expect(additional).not.toHaveAttribute("open");
+  await additional.getByText("Additional buyer information").click();
+  await expect(additional).toContainText("Cambodia");
+});
+
+test("a website inquiry reaches Leads & CRM; sales qualifies, assigns and notes it; its earlier details stay", async ({ page }) => {
   const company = `Feed Co ${randomUUID().slice(0, 8)}`;
   const reference = await ingestInquiry(company);
 
   await loginViaUi(page, "sales", "/sales/inquiries");
-  await expect(page.locator("aside").getByRole("link", { name: "Yêu cầu giao thương" })).toBeVisible();
+  await expect(page.locator("aside").getByRole("link", { name: "Leads & CRM" })).toBeVisible();
   await page.getByLabel("Tìm yêu cầu").fill(company);
   const row = page.getByTestId("inquiry-row").filter({ hasText: reference });
   await expect(row).toHaveCount(1);
@@ -55,12 +138,18 @@ test("a website inquiry reaches the sales inbox; sales qualifies, assigns and no
   await expect(page).toHaveURL(/\/sales\/inquiries\/[0-9a-f-]{36}$/);
   await expect(page.getByTestId("inquiry-reference")).toHaveText(reference);
   await expect(page.getByTestId("inquiry-status")).toHaveText("Mới");
-  await expect(page.getByTestId("inquiry-missing")).toContainText("Người liên hệ");
-  await expect(page.getByTestId("inquiry-missing")).toContainText("Điểm đến");
-  await expect(page.getByText("Required starch %")).toBeVisible();
-  // Incoterm is part of the supply execution, not the product specification.
-  await expect(page.getByTestId("inquiry-execution")).toContainText("CIF");
-  await expect(page.getByTestId("inquiry-execution")).not.toContainText("Required starch %");
+  // No destination: Customer Service.
+  await expect(page.getByTestId("inquiry-summary").getByTestId("inquiry-route")).toHaveText("Customer Service");
+  await expect(page.getByTestId("inquiry-buyer-notes")).toHaveText("Monthly contract, samples first.");
+  // The earlier inquiry's application and requirements stay, folded away in a secondary section.
+  const additional = page.getByTestId("inquiry-additional");
+  await expect(additional).not.toHaveAttribute("open");
+  await expect(page.getByText("Required starch %")).toBeHidden();
+  await additional.getByText("Additional buyer information").click();
+  await expect(additional).toContainText("Cambodia");
+  await expect(additional).toContainText("Animal feed");
+  await expect(additional.getByText("Required starch %")).toBeVisible();
+  await expect(additional).toContainText("CIF");
   await expect(page.getByRole("link", { name: "Gửi email cho người mua" })).toHaveAttribute(
     "href",
     new RegExp(`^mailto:buyer@example\\.com\\?subject=.*${reference}`),
@@ -99,7 +188,7 @@ test("a website inquiry reaches the sales inbox; sales qualifies, assigns and no
 test("an editor has no sales inbox: no menu entry, a forbidden page, and the API refuses", async ({ page }) => {
   await loginViaUi(page, "editor", "/sales/inquiries");
   await expect(page.getByTestId("inquiries-forbidden")).toBeVisible();
-  await expect(page.locator("aside").getByRole("link", { name: "Yêu cầu giao thương" })).toHaveCount(0);
+  await expect(page.locator("aside").getByRole("link", { name: "Leads & CRM" })).toHaveCount(0);
   const api = await apiAs("editor");
   await api.get("/api/v1/admin/trade-inquiries", 403);
   await api.dispose();

@@ -1,13 +1,15 @@
 # Trade inquiries (sales inbox)
 
 Buyer inquiries from the public website's HMV Trade Desk are stored in the CMS database and worked in the CMS
-**Sales → Yêu cầu giao thương** screen. PostgreSQL is the system of record; the notification email is a convenience.
+**Sales → Leads & CRM** screen. PostgreSQL is the system of record; the notification email is a convenience.
 
-HMV's positioning: *Integrated agricultural supply and trade execution* (*Phương án cung ứng và thực thi giao thương
-nông sản xuyên suốt*). Every inquiry is **product-led**: the buyer asks for one HMV product, and logistics and compliance
-are requirements of that product's supply plan (origin, destination and port, volume, transport, Incoterm,
-packaging/loading, delivery window, certification, destination requirements), never inquiries of their own. There is
-no goal or inquiry type, and no free-text goods field.
+Every inquiry is **product-led**: the buyer asks for one HMV product. The website's chat-first Trade Desk asks only the
+product, the delivery destination and the expected volume; technical and logistics points are for the commercial
+discussion. Each lead's **route** is derived from what is stored, never stored itself and never a status change:
+product, destination and volume known is **Sales · RFQ** (ready for quotation); anything less is **Customer Service**
+(the buyer is still clarifying the requirement). Earlier inquiries may also carry application, transport and product
+or supply requirements; they are kept as the buyer gave them. There is no goal or inquiry type, and no free-text goods
+field.
 
 ```
 Browser ──► www.hmv-global.com/api/inquiry (Next.js, same origin)
@@ -35,7 +37,7 @@ Migration `backend/prisma/migrations/20261112090000_trade_inquiries`.
 | `status` | `NEW → CONTACTED → QUALIFIED → QUOTED → WON / LOST`. Any transition is allowed (sales corrects mistakes). |
 | `locale` | `en`/`vi`. |
 | `productId`, `productName` | Required. Website product id and its English name. No relation to the Commodity/ProductVariant tables. |
-| `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` defaults to the product's first origin. |
+| `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` only when the buyer gave one the product offers (null otherwise, never assumed: the Trade Desk does not ask it). |
 | `requirements` | JSON array `{key, label, value}` of the answered product requirements (specification and supply execution), in contract order. |
 | `buyerNotes` | Free text, ≤ 2000. |
 | `company`, `contactName`, `email` (lower-cased), `phone` | Contact. |
@@ -201,21 +203,22 @@ get 401 in between, and the website shows its retry/email fallback.
 
 ## Sales workflow
 
-1. A new inquiry appears in **Sales → Yêu cầu giao thương** (the list re-polls every 30 s while the tab is open) and,
+1. A new inquiry appears in **Sales → Leads & CRM** (the list re-polls every 30 s while the tab is open) and,
    if enabled, in the notification mailbox. Times are shown in Vietnam time (Asia/Ho_Chi_Minh, UTC+7), and a date
    filter selects that Vietnam calendar day (`2026-11-12` = `2026-11-11T17:00Z` up to, not including,
    `2026-11-12T17:00Z`).
 2. Open it, assign it, contact the buyer: **Gửi email cho người mua** (mailto with the reference), **Sao chép số điện
    thoại**, or **Mở WhatsApp** (only for numbers given with a country code). Nothing is sent automatically.
 3. Move the status as the deal progresses; record calls and agreements as notes.
-4. The "Chưa cung cấp" line lists core details the buyer left empty — ask for them on first contact.
+4. **Tuyến xử lý** says who works the lead: Sales · RFQ goes to quotation; Customer Service helps a buyer still
+   clarifying the destination or volume.
 
-The inbox lists reference and time, company and contact, product, destination, volume, status, email state, assignee
-and source, and filters by status, product, assignee, date, `utm_source` and search. An inquiry page shows the buyer
-and contact; the commercial requirement (product, origin, destination, volume, application, transport, product
-specification); the supply execution requirements (packaging/loading, Incoterm, destination port, certification,
-destination requirements, delivery window) — only what the buyer gave; sales handling (status, assignee, email state,
-internal notes); and attribution (landing page, referrer origin, UTM).
+The inbox lists reference, company and contact, product, destination, volume, route, status, assignee, source and
+time received (with the notification email state), and filters by status, product, assignee, date, `utm_source` and
+search. A lead page starts with its summary (company, buyer, product, destination, volume, route, status, assignee),
+then the buyer's own message, the contact, any **Additional buyer information** from an earlier inquiry (origin,
+application, transport, requirements; folded away), internal notes, sales handling (status, assignee, email state) and
+attribution (landing page, referrer origin, UTM).
 
 ## Local development: the migration was edited before release
 
