@@ -28,6 +28,7 @@ import {
   STATUS_VARIANT,
   buyerMailto,
   formatVietnamDateTime,
+  hasAdditionalBuyerInformation,
   inquiryRoute,
   inquirySource,
   inquiryVolume,
@@ -130,7 +131,7 @@ function LeadSummary({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
  * the buyer gave it, folded away. Today's desk asks none of it, so a new lead has no such section.
  */
 function AdditionalBuyerInformation({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
-  if (!inquiry.application && !inquiry.transport && inquiry.requirements.length === 0) return null;
+  if (!hasAdditionalBuyerInformation(inquiry)) return null;
   return (
     <Card className="border-slate-200 shadow-2xs bg-white">
       <details data-testid="inquiry-additional">

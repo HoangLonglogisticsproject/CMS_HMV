@@ -16,9 +16,10 @@ import { getArticlePublishReadiness } from "@/modules/content/articles/utils/pub
 import {
   buyerMailto,
   formatVietnamDateTime,
+  hasAdditionalBuyerInformation,
+  inquiryRoute,
   inquirySource,
   inquiryVolume,
-  inquiryRoute,
   noteAfterSave,
   ROUTE_LABEL,
   settledPage,
@@ -244,6 +245,16 @@ test.describe("sales inbox formatting", () => {
     utmSource: null,
     referrerOrigin: null,
   };
+
+  test("additional buyer information: shown for any earlier detail, an origin alone included; never for a lead without", () => {
+    const none = { origin: null, application: null, transport: null, requirements: [] };
+    // Today's Trade Desk lead: no origin, application, transport or requirements, so no empty extra section.
+    expect(hasAdditionalBuyerInformation(none)).toBe(false);
+    expect(hasAdditionalBuyerInformation({ ...none, origin: "Cambodia" })).toBe(true);
+    expect(hasAdditionalBuyerInformation({ ...none, application: "Animal feed" })).toBe(true);
+    expect(hasAdditionalBuyerInformation({ ...none, transport: "Sea freight (FCL)" })).toBe(true);
+    expect(hasAdditionalBuyerInformation({ ...none, requirements: [{ key: "incoterm", label: "Incoterm", value: "CIF" }] })).toBe(true);
+  });
 
   test("route: product, destination and volume make a Sales RFQ; anything less is Customer Service", () => {
     const lead = { productName: "Dried cassava chips", destination: "Chennai, India", volumeAmount: "2,000" };

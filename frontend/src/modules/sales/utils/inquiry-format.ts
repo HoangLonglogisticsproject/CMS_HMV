@@ -73,6 +73,17 @@ interface Brief {
   referrerOrigin: string | null;
 }
 
+/**
+ * Whether a lead carries details today's Trade Desk does not ask (origin, application, transport, requirements): an
+ * earlier inquiry's, shown in the secondary "Additional buyer information" section. An origin alone counts.
+ */
+export const hasAdditionalBuyerInformation = (i: {
+  origin: string | null;
+  application: string | null;
+  transport: string | null;
+  requirements: readonly unknown[];
+}) => Boolean(i.origin || i.application || i.transport || i.requirements.length > 0);
+
 export const inquiryVolume = (i: Brief) =>
   i.volumeAmount ? [i.volumeAmount, i.volumeUnit].filter(Boolean).join(" ") : null;
 

@@ -103,6 +103,23 @@ test("an admin has Leads & CRM too", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Leads & Yêu cầu giao thương" })).toBeVisible();
 });
 
+test("an earlier lead with only an origin keeps it, under Additional buyer information, not in the summary", async ({ page }) => {
+  const reference = await ingestInquiry(`Origin Only ${randomUUID().slice(0, 8)}`, { ...rfqReady, origin: "cambodia" });
+  const api = await apiAs("sales");
+  const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${reference}`);
+  await api.dispose();
+
+  await loginViaUi(page, "sales", `/sales/inquiries/${items[0].id}`);
+  const summary = page.getByTestId("inquiry-summary");
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
+  await expect(summary).not.toContainText("Cambodia");
+  const additional = page.getByTestId("inquiry-additional");
+  await expect(additional).toBeVisible();
+  await expect(additional).not.toHaveAttribute("open");
+  await additional.getByText("Additional buyer information").click();
+  await expect(additional).toContainText("Cambodia");
+});
+
 test("a website inquiry reaches Leads & CRM; sales qualifies, assigns and notes it; its earlier details stay", async ({ page }) => {
   const company = `Feed Co ${randomUUID().slice(0, 8)}`;
   const reference = await ingestInquiry(company);
