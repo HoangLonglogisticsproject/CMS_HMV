@@ -258,6 +258,50 @@ describe('Trade inquiries (PostgreSQL)', () => {
       );
     });
 
+    it('origin: stored only when the buyer gave one the product offers; an earlier row keeps its stored origin', async () => {
+      // The chat-first Trade Desk does not ask an origin: none is stored, none assumed.
+      const none = await ingest(cassava({ origin: undefined })).expect(201);
+      expect((await row(none.body.reference)).origin).toBeNull();
+      const blank = await ingest(cassava({ origin: '  ' })).expect(201);
+      expect((await row(blank.body.reference)).origin).toBeNull();
+      const vietnam = await ingest(
+        cassava({
+          productId: 'passion-fruit',
+          origin: 'vietnam',
+          application: undefined,
+          requirements: {},
+        }),
+      ).expect(201);
+      expect((await row(vietnam.body.reference)).origin).toBe('Vietnam');
+      // Cambodia is offered for dried cassava chips only.
+      expect(
+        (await row((await ingest(cassava()).expect(201)).body.reference))
+          .origin,
+      ).toBe('Cambodia');
+      const refused = await ingest(
+        cassava({
+          productId: 'passion-fruit',
+          origin: 'cambodia',
+          application: undefined,
+          requirements: {},
+        }),
+      ).expect(400);
+      expect(refused.body.details).toEqual([
+        { path: 'origin', message: 'origin is not offered for this product' },
+      ]);
+
+      // A row stored before this change (with the then-default origin) is read back as stored: nothing rewrites it.
+      const earlier = await row(none.body.reference);
+      await t.prisma.tradeInquiry.update({
+        where: { id: earlier.id },
+        data: { origin: 'Vietnam' },
+      });
+      await ingest(cassava({ origin: undefined })).expect(201);
+      expect(
+        (await sales.get(`${ADMIN}/${earlier.id}`).expect(200)).body.origin,
+      ).toBe('Vietnam');
+    });
+
     it('the same idempotency key returns the existing inquiry (200, duplicate) and sends no second email, also concurrently', async () => {
       const key = randomUUID();
       const first = await ingest(cassava(), key).expect(201);

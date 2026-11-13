@@ -41,7 +41,7 @@ async function ingestInquiry(company: string, over: Record<string, unknown> = {}
 
 /** What today's chat-first Trade Desk sends for a buyer ready for quotation: product, destination and volume only. */
 const rfqReady = {
-  origin: "vietnam",
+  origin: undefined,
   destination: "Chennai, India",
   volume: { amount: "2,000", unit: "mt_month" },
   application: undefined,
@@ -76,7 +76,7 @@ test("Leads & CRM: a complete lead is a Sales RFQ, an incomplete one goes to Cus
   await expect(summary).toContainText("Dried cassava chips");
   await expect(summary).toContainText("Chennai, India");
   await expect(summary).toContainText("2,000 MT / month");
-  await expect(page.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
   await expect(page.getByTestId("inquiry-status")).toHaveText("Mới");
   await expect(page.getByTestId("inquiry-assignee")).toHaveText("Chưa giao");
   // Nothing the buyer was never asked: no missing-information list, no historical section.
@@ -86,8 +86,10 @@ test("Leads & CRM: a complete lead is a Sales RFQ, an incomplete one goes to Cus
   await page.goto("/sales/inquiries");
   await page.getByLabel("Tìm yêu cầu").fill(prefix);
   await discoveryRow.getByRole("link", { name: discovery }).click();
-  await expect(page.getByTestId("inquiry-route")).toHaveText("Customer Service");
-  await expect(page.getByTestId("inquiry-summary")).toContainText("Điểm đến—");
+  // The lead page, not the list it came from (whose rows also carry route badges).
+  await expect(summary).toContainText(`${prefix} Explore`);
+  await expect(summary.getByTestId("inquiry-route")).toHaveText("Customer Service");
+  await expect(summary).toContainText("Điểm đến—");
 
   const api = await apiAs("sales");
   const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${encodeURIComponent(prefix)}`);
@@ -120,7 +122,7 @@ test("a website inquiry reaches Leads & CRM; sales qualifies, assigns and notes 
   await expect(page.getByTestId("inquiry-reference")).toHaveText(reference);
   await expect(page.getByTestId("inquiry-status")).toHaveText("Mới");
   // No destination: Customer Service.
-  await expect(page.getByTestId("inquiry-route")).toHaveText("Customer Service");
+  await expect(page.getByTestId("inquiry-summary").getByTestId("inquiry-route")).toHaveText("Customer Service");
   await expect(page.getByTestId("inquiry-buyer-notes")).toHaveText("Monthly contract, samples first.");
   // The earlier inquiry's application and requirements stay, folded away in a secondary section.
   const additional = page.getByTestId("inquiry-additional");

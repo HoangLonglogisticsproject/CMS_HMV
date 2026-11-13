@@ -142,7 +142,7 @@ export class IngestTradeInquiryDto {
   @MaxLength(64)
   productId: string;
 
-  /** An origin id the product offers ("vietnam"); the product's first origin when left out. */
+  /** An origin id the product offers ("vietnam"), when the buyer gave one; left out, no origin is stored. */
   @IsOptional()
   @IsString()
   @Transform(trim)

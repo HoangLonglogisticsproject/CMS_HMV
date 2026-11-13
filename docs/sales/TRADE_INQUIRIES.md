@@ -37,7 +37,7 @@ Migration `backend/prisma/migrations/20261112090000_trade_inquiries`.
 | `status` | `NEW → CONTACTED → QUALIFIED → QUOTED → WON / LOST`. Any transition is allowed (sales corrects mistakes). |
 | `locale` | `en`/`vi`. |
 | `productId`, `productName` | Required. Website product id and its English name. No relation to the Commodity/ProductVariant tables. |
-| `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` defaults to the product's first origin. |
+| `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` only when the buyer gave one the product offers (null otherwise, never assumed: the Trade Desk does not ask it). |
 | `requirements` | JSON array `{key, label, value}` of the answered product requirements (specification and supply execution), in contract order. |
 | `buyerNotes` | Free text, ≤ 2000. |
 | `company`, `contactName`, `email` (lower-cased), `phone` | Contact. |

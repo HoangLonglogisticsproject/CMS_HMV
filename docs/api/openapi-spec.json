@@ -6183,7 +6183,7 @@
           },
           "origin": {
             "type": "string",
-            "description": "An origin id the product offers (\"vietnam\"); the product's first origin when left out.",
+            "description": "An origin id the product offers (\"vietnam\"), when the buyer gave one; left out, no origin is stored.",
             "maxLength": 120
           },
           "destination": {
