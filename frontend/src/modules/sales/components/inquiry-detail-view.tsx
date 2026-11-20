@@ -95,6 +95,18 @@ function Field({ label, value }: Readonly<{ label: string; value: React.ReactNod
   );
 }
 
+/** "Tiếng Trung giản thể (zh-CN)": may wrap between words, never inside the code, whose hyphen is a break point. */
+function SourceLocaleLabel({ code }: Readonly<{ code: string }>) {
+  const label = sourceLocaleLabel(code);
+  const tag = ` (${code})`;
+  if (!label.endsWith(tag)) return <span className="whitespace-nowrap">{label}</span>;
+  return (
+    <span>
+      {label.slice(0, -tag.length)} <span className="whitespace-nowrap">({code})</span>
+    </span>
+  );
+}
+
 /** The lead at a glance: who, what, where, how much, and who works it. */
 function LeadSummary({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
   const route = inquiryRoute(inquiry);
@@ -189,7 +201,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
             {inquiry.reference}
           </h1>
           <Badge variant="outline" title="Ngôn ngữ trang nguồn" data-testid="inquiry-source-locale">
-            {sourceLocaleLabel(source)}
+            <SourceLocaleLabel code={source} />
           </Badge>
           {/* The Trade Desk's own language, only when the source page's differs (a /zh-cn/ or /ko/ page). */}
           {source !== inquiry.locale && (
@@ -364,7 +376,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
             <dl className="space-y-1.5">
               <Field label="Nguồn" value={inquirySource(inquiry)} />
               <Field label="Trang gửi" value={inquiry.landingPage && <span className="font-mono">{inquiry.landingPage}</span>} />
-              <Field label="Ngôn ngữ trang nguồn" value={<span data-testid="inquiry-source-page-locale">{sourceLocaleLabel(source)}</span>} />
+              <Field label="Ngôn ngữ trang nguồn" value={<span data-testid="inquiry-source-page-locale"><SourceLocaleLabel code={source} /></span>} />
               <Field label="Trang giới thiệu" value={inquiry.referrerOrigin} />
               <Field label="utm_medium" value={inquiry.utmMedium} />
               <Field label="utm_campaign" value={inquiry.utmCampaign} />

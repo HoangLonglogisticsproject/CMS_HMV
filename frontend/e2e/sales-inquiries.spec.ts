@@ -123,25 +123,42 @@ test("an earlier lead with only an origin keeps it, under Additional buyer infor
   await expect(additional).toContainText("Cambodia");
 });
 
-test("a lead from the /zh-cn/ page shows Simplified Chinese as its source language; the Trade Desk stays EN", async ({ page }) => {
-  // Today's ingestion contract unchanged: locale is the Trade Desk's, the page is only the stored landing page.
-  const reference = await ingestInquiry(`ZH Source ${randomUUID().slice(0, 8)}`, {
-    ...rfqReady,
-    locale: "en",
-    source: { landingPage: "/zh-cn/cassava-chips" },
-  });
+test("a lead from a /zh-cn/ or /ko/ page shows that page's language, the Trade Desk stays EN; the code never splits", async ({ page }) => {
+  const leads = [
+    { landingPage: "/zh-cn/cassava-chips", label: "Tiếng Trung giản thể (zh-CN)", code: "(zh-CN)" },
+    { landingPage: "/ko/tapioca-chips", label: "Tiếng Hàn (ko)", code: "(ko)" },
+  ];
   const api = await apiAs("sales");
-  const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${reference}`);
-  const detail = await api.get(`/api/v1/admin/trade-inquiries/${items[0].id}`);
+  const ids: string[] = [];
+  for (const { landingPage } of leads) {
+    // Today's ingestion contract unchanged: locale is the Trade Desk's, the page is only the stored landing page.
+    const reference = await ingestInquiry(`Source ${randomUUID().slice(0, 8)}`, { ...rfqReady, locale: "en", source: { landingPage } });
+    const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${reference}`);
+    expect(await api.get(`/api/v1/admin/trade-inquiries/${items[0].id}`)).toMatchObject({ locale: "en", landingPage });
+    ids.push(items[0].id);
+  }
   await api.dispose();
-  expect(detail).toMatchObject({ locale: "en", landingPage: "/zh-cn/cassava-chips" });
 
-  await loginViaUi(page, "sales", `/sales/inquiries/${items[0].id}`);
-  await expect(page.getByTestId("inquiry-reference")).toHaveText(reference);
-  await expect(page.getByTestId("inquiry-source-locale")).toHaveText("Tiếng Trung giản thể (zh-CN)");
-  await expect(page.getByTestId("inquiry-trade-desk-locale")).toHaveText("Trade Desk EN");
-  await expect(page.getByTestId("inquiry-source-page-locale")).toHaveText("Tiếng Trung giản thể (zh-CN)");
-  await expect(page.getByText("Ngôn ngữ trang nguồn", { exact: true })).toBeVisible();
+  await loginViaUi(page, "sales", `/sales/inquiries/${ids[0]}`);
+  for (const [i, { label, code }] of leads.entries()) {
+    await page.goto(`/sales/inquiries/${ids[i]}`);
+    const header = page.getByTestId("inquiry-source-locale");
+    const field = page.getByTestId("inquiry-source-page-locale");
+    await expect(header).toHaveText(label);
+    await expect(page.getByTestId("inquiry-trade-desk-locale")).toHaveText("Trade Desk EN");
+    await expect(field).toHaveText(label);
+    await expect(page.getByText("Ngôn ngữ trang nguồn", { exact: true })).toBeVisible();
+    // The desktop sidebar's narrow column and a phone: the label may wrap, the code stays on one line, no sideways scroll.
+    for (const width of [1024, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const where of [header, field]) {
+        // One line = one top (Chrome returns a rect per text run, "(" "zh-CN" ")", on the same line).
+        const lines = await where.getByText(code, { exact: true }).evaluate((el) => new Set([...el.getClientRects()].map((r) => Math.round(r.top))).size);
+        expect(lines).toBe(1);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    }
+  }
 });
 
 test("a website inquiry reaches Leads & CRM; sales qualifies, assigns and notes it; its earlier details stay", async ({ page }) => {
