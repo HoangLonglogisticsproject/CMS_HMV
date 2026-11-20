@@ -23,6 +23,8 @@ import {
   noteAfterSave,
   ROUTE_LABEL,
   settledPage,
+  sourceLocale,
+  sourceLocaleLabel,
   whatsAppLink,
 } from "@/modules/sales/utils/inquiry-format";
 
@@ -279,6 +281,25 @@ test.describe("sales inbox formatting", () => {
     expect(inquirySource({ ...brief, utmSource: "linkedin", referrerOrigin: "https://www.google.com" })).toBe("utm: linkedin");
     expect(inquirySource({ ...brief, referrerOrigin: "https://www.google.com" })).toBe("www.google.com");
     expect(inquirySource(brief)).toBe("Truy cập trực tiếp");
+  });
+
+  test("source-page language: the scoped /zh-cn/ and /ko/ pages, else the Trade Desk locale", () => {
+    expect(sourceLocale({ landingPage: "/zh-cn/cassava-chips", locale: "en" })).toBe("zh-CN");
+    expect(sourceLocale({ landingPage: "/ko/tapioca-chips", locale: "en" })).toBe("ko");
+    expect(sourceLocale({ landingPage: "/products/dried-cassava-chips", locale: "en" })).toBe("en");
+    expect(sourceLocale({ landingPage: "/vi/san-pham", locale: "vi" })).toBe("vi");
+    expect(sourceLocale({ landingPage: null, locale: "vi" })).toBe("vi");
+    // A prefix of the path segment, not of the text: these are not the scoped pages.
+    expect(sourceLocale({ landingPage: "/zh-cnx/page", locale: "en" })).toBe("en");
+    expect(sourceLocale({ landingPage: "/korea", locale: "en" })).toBe("en");
+    expect(sourceLocale({ landingPage: "/blog/ko/post", locale: "en" })).toBe("en");
+    expect(["zh-CN", "ko", "en", "vi", "fr"].map(sourceLocaleLabel)).toEqual([
+      "Tiếng Trung giản thể (zh-CN)",
+      "Tiếng Hàn (ko)",
+      "English (en)",
+      "Tiếng Việt (vi)",
+      "fr", // unknown: shown as itself, never blank
+    ]);
   });
 
   test("WhatsApp link only for an international number", () => {

@@ -33,6 +33,8 @@ import {
   inquirySource,
   inquiryVolume,
   noteAfterSave,
+  sourceLocale,
+  sourceLocaleLabel,
   whatsAppLink,
 } from "../utils/inquiry-format";
 
@@ -90,6 +92,18 @@ function Field({ label, value }: Readonly<{ label: string; value: React.ReactNod
       <dt className="text-slate-500">{label}</dt>
       <dd className="min-w-0 text-slate-900 [overflow-wrap:anywhere]">{value ?? <span className="text-slate-400">—</span>}</dd>
     </div>
+  );
+}
+
+/** "Tiếng Trung giản thể (zh-CN)": may wrap between words, never inside the code, whose hyphen is a break point. */
+function SourceLocaleLabel({ code }: Readonly<{ code: string }>) {
+  const label = sourceLocaleLabel(code);
+  const tag = ` (${code})`;
+  if (!label.endsWith(tag)) return <span className="whitespace-nowrap">{label}</span>;
+  return (
+    <span>
+      {label.slice(0, -tag.length)} <span className="whitespace-nowrap">({code})</span>
+    </span>
   );
 }
 
@@ -161,6 +175,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
   const [note, setNote] = useState("");
 
   const whatsApp = whatsAppLink(inquiry.phone);
+  const source = sourceLocale(inquiry);
 
   const save = (body: Parameters<typeof update.mutate>[0], done: string) =>
     update.mutate(body, {
@@ -185,7 +200,15 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
           <h1 className="text-base font-bold text-[#123D68] font-mono" data-testid="inquiry-reference">
             {inquiry.reference}
           </h1>
-          <Badge variant="outline">{inquiry.locale.toUpperCase()}</Badge>
+          <Badge variant="outline" title="Ngôn ngữ trang nguồn" data-testid="inquiry-source-locale">
+            <SourceLocaleLabel code={source} />
+          </Badge>
+          {/* The Trade Desk's own language, only when the source page's differs (a /zh-cn/ or /ko/ page). */}
+          {source !== inquiry.locale && (
+            <Badge variant="secondary" title="Ngôn ngữ Trade Desk" data-testid="inquiry-trade-desk-locale">
+              Trade Desk {inquiry.locale.toUpperCase()}
+            </Badge>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="h-8 text-xs bg-[#087EC2] hover:bg-[#066ba8] text-white gap-1.5">
@@ -353,6 +376,7 @@ function InquiryDetailBody({ inquiry }: Readonly<{ inquiry: InquiryDetail }>) {
             <dl className="space-y-1.5">
               <Field label="Nguồn" value={inquirySource(inquiry)} />
               <Field label="Trang gửi" value={inquiry.landingPage && <span className="font-mono">{inquiry.landingPage}</span>} />
+              <Field label="Ngôn ngữ trang nguồn" value={<span data-testid="inquiry-source-page-locale"><SourceLocaleLabel code={source} /></span>} />
               <Field label="Trang giới thiệu" value={inquiry.referrerOrigin} />
               <Field label="utm_medium" value={inquiry.utmMedium} />
               <Field label="utm_campaign" value={inquiry.utmCampaign} />
