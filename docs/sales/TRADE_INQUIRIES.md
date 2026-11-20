@@ -35,7 +35,7 @@ Migration `backend/prisma/migrations/20261112090000_trade_inquiries`.
 | `reference` | `HMV-YYYY-XXXXXX`, unique. 6 characters from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (no 0/O/1/I), `crypto.randomInt`, retried on collision. The CMS generates it; the website shows it to the buyer. |
 | `idempotencyKey` | Unique. The website's key for one submission; a repeat returns the same inquiry. Never returned by the admin API. |
 | `status` | `NEW → CONTACTED → QUALIFIED → QUOTED → WON / LOST`. Any transition is allowed (sales corrects mistakes). |
-| `locale` | `en`/`vi`. |
+| `locale` | `en`/`vi`: the language of the Trade Desk the buyer used, not of the page it sat on (see *Source-page language*). |
 | `productId`, `productName` | Required. Website product id and its English name. No relation to the Commodity/ProductVariant tables. |
 | `origin`, `destination`, `volumeAmount`, `volumeUnit`, `application`, `transport` | The buyer's commercial requirement. Controlled values are stored as English labels; `origin` only when the buyer gave one the product offers (null otherwise, never assumed: the Trade Desk does not ask it). |
 | `requirements` | JSON array `{key, label, value}` of the answered product requirements (specification and supply execution), in contract order. |
@@ -218,7 +218,15 @@ time received (with the notification email state), and filters by status, produc
 search. A lead page starts with its summary (company, buyer, product, destination, volume, route, status, assignee),
 then the buyer's own message, the contact, any **Additional buyer information** from an earlier inquiry (origin,
 application, transport, requirements; folded away), internal notes, sales handling (status, assignee, email state) and
-attribution (landing page, referrer origin, UTM).
+attribution (landing page, source-page language, referrer origin, UTM).
+
+**Source-page language.** `locale` is the language of the Trade Desk (`en`/`vi`); the website's scoped pages run it in
+English, so a lead from `/zh-cn/cassava-chips` is stored with `locale = en`. The CMS UI derives the source page's
+language from the stored `landingPage` for known scoped paths: `/zh-cn/*` → Tiếng Trung giản thể (zh-CN), `/ko/*` →
+Tiếng Hàn (ko); any other page falls back to `locale`. The lead page shows it in its header (with a **Trade Desk EN/VI**
+badge when the two differ) and as **Ngôn ngữ trang nguồn** under attribution. This is source attribution, not an
+explicit buyer language preference: the buyer never chose a follow-up language, and nothing is inferred from IP,
+destination or the buyer's text. Nothing is stored for it; the ingestion contract, signing and schema are unchanged.
 
 ## Local development: the migration was edited before release
 

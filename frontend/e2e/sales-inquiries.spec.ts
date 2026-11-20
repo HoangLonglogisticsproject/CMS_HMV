@@ -110,6 +110,9 @@ test("an earlier lead with only an origin keeps it, under Additional buyer infor
   await api.dispose();
 
   await loginViaUi(page, "sales", `/sales/inquiries/${items[0].id}`);
+  // A standard English page: its language is the Trade Desk's, so no second badge.
+  await expect(page.getByTestId("inquiry-source-locale")).toHaveText("English (en)");
+  await expect(page.getByTestId("inquiry-trade-desk-locale")).toHaveCount(0);
   const summary = page.getByTestId("inquiry-summary");
   await expect(summary.getByTestId("inquiry-route")).toHaveText("Sales · RFQ");
   await expect(summary).not.toContainText("Cambodia");
@@ -118,6 +121,27 @@ test("an earlier lead with only an origin keeps it, under Additional buyer infor
   await expect(additional).not.toHaveAttribute("open");
   await additional.getByText("Additional buyer information").click();
   await expect(additional).toContainText("Cambodia");
+});
+
+test("a lead from the /zh-cn/ page shows Simplified Chinese as its source language; the Trade Desk stays EN", async ({ page }) => {
+  // Today's ingestion contract unchanged: locale is the Trade Desk's, the page is only the stored landing page.
+  const reference = await ingestInquiry(`ZH Source ${randomUUID().slice(0, 8)}`, {
+    ...rfqReady,
+    locale: "en",
+    source: { landingPage: "/zh-cn/cassava-chips" },
+  });
+  const api = await apiAs("sales");
+  const { items } = await api.get(`/api/v1/admin/trade-inquiries?search=${reference}`);
+  const detail = await api.get(`/api/v1/admin/trade-inquiries/${items[0].id}`);
+  await api.dispose();
+  expect(detail).toMatchObject({ locale: "en", landingPage: "/zh-cn/cassava-chips" });
+
+  await loginViaUi(page, "sales", `/sales/inquiries/${items[0].id}`);
+  await expect(page.getByTestId("inquiry-reference")).toHaveText(reference);
+  await expect(page.getByTestId("inquiry-source-locale")).toHaveText("Tiếng Trung giản thể (zh-CN)");
+  await expect(page.getByTestId("inquiry-trade-desk-locale")).toHaveText("Trade Desk EN");
+  await expect(page.getByTestId("inquiry-source-page-locale")).toHaveText("Tiếng Trung giản thể (zh-CN)");
+  await expect(page.getByText("Ngôn ngữ trang nguồn", { exact: true })).toBeVisible();
 });
 
 test("a website inquiry reaches Leads & CRM; sales qualifies, assigns and notes it; its earlier details stay", async ({ page }) => {

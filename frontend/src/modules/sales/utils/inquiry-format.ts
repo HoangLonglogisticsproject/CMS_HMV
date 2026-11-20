@@ -49,6 +49,26 @@ export const PRODUCT_LABEL: Record<string, string> = {
   "tapioca-starch": "Tinh bột sắn",
 };
 
+/**
+ * The language of the page the buyer sent the inquiry from, derived from its landing page: the website's scoped
+ * /zh-cn/ and /ko/ pages run the Trade Desk in English, so their `locale` (the Trade Desk's language, en/vi) does not
+ * say it. Source attribution only, not a language the buyer chose; never inferred from IP, destination or buyer text.
+ */
+export const sourceLocale = (i: { landingPage: string | null; locale: string }) => {
+  if (i.landingPage?.startsWith("/zh-cn/")) return "zh-CN";
+  if (i.landingPage?.startsWith("/ko/")) return "ko";
+  return i.locale;
+};
+
+const SOURCE_LOCALE_LABEL: Record<string, string> = {
+  "zh-CN": "Tiếng Trung giản thể (zh-CN)",
+  ko: "Tiếng Hàn (ko)",
+  en: "English (en)",
+  vi: "Tiếng Việt (vi)",
+};
+/** A locale code the table does not know is shown as itself. */
+export const sourceLocaleLabel = (code: string) => SOURCE_LOCALE_LABEL[code] ?? code;
+
 export const NOTIFICATION_LABEL: Record<NotificationStatus, string> = {
   PENDING: "Email thông báo đang chờ gửi",
   SENDING: "Đang gửi email thông báo",
